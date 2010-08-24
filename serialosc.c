@@ -14,10 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <string.h>
-#include <unistd.h>
+#define _GNU_SOURCE /* for asprintf */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <lo/lo.h>
 #include <dns_sd.h>
@@ -40,6 +40,16 @@ static void lo_error(int num, const char *error_msg, const char *path) {
 	fflush(stderr);
 }
 
+static void handle_press(const monome_event_t *e, void *data) {
+	sosc_state_t *state = data;
+	char *cmd;
+
+	asprintf(&cmd, "%s/press", state->osc_prefix);
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
+	             e->x, e->y, e->event_type);
+	free(cmd);
+}
+
 void router_process(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
@@ -58,6 +68,11 @@ void router_process(monome_t *monome) {
 	                   lo_server_get_port(state.server), 0, NULL, NULL, NULL);
 	printf(" => %s at %s\n", monome_get_serial(state.monome),
 		   monome_get_devpath(monome));
+
+	monome_register_handler(state.monome, MONOME_BUTTON_DOWN,
+                            handle_press, &state);
+	monome_register_handler(state.monome, MONOME_BUTTON_UP,
+	                        handle_press, &state);
 
 	monome_set_orientation(state.monome, MONOME_CABLE_LEFT);
 	monome_clear(state.monome, MONOME_CLEAR_OFF);
