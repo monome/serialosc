@@ -88,10 +88,13 @@ monome_t *next_connected_device(struct udev *u) {
 		return NULL;
 
 	udev_enumerate_add_match_subsystem(ue, "tty");
+	udev_enumerate_add_match_property(ue, "ID_BUS", "usb");
 	udev_enumerate_scan_devices(ue);
 	cursor = udev_enumerate_get_list_entry(ue);
 
-	do {
+	for( cursor = udev_enumerate_get_list_entry(ue); cursor;
+		 cursor = udev_list_entry_get_next(cursor), device = NULL ) {
+
 		ud = udev_device_new_from_syspath(u, udev_list_entry_get_name(cursor));
 		devnode = strdup(udev_device_get_devnode(ud));
 		udev_device_unref(ud);
@@ -101,7 +104,7 @@ monome_t *next_connected_device(struct udev *u) {
 
 		if( !fork() )
 			break;
-	} while( (cursor = udev_list_entry_get_next(cursor)) );
+	}
 
 	udev_enumerate_unref(ue);
 	return device;
