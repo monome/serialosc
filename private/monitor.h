@@ -14,7 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <monome.h>
+
 /* returns the devpath to a device when it is attached.
    this function returns in a subprocess. */
 
-const char *next_device();
+monome_t *next_device();

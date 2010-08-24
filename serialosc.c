@@ -40,16 +40,11 @@ static void lo_error(int num, const char *error_msg, const char *path) {
 	fflush(stderr);
 }
 
-void router_process(const char *device) {
-	sosc_state_t state;
-
-	if( !(state.monome = monome_open(device)) ) {
-		printf("failed opening %s\n", device);
-		return;
-	}
+void router_process(monome_t *monome) {
+	sosc_state_t state = { .monome = monome };
 
 	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
-		goto err_lo_server;
+		return;
 
 	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_PORT,
 	                                      DEFAULT_OSC_APP_HOST)) )
@@ -61,7 +56,8 @@ void router_process(const char *device) {
 	DNSServiceRegister(&state.ref, 0, 0, monome_get_serial(state.monome),
 	                   "_monome-osc._udp", NULL, NULL,
 	                   lo_server_get_port(state.server), 0, NULL, NULL, NULL);
-	printf(" => %s at %s\n", monome_get_serial(state.monome), device);
+	printf(" => %s at %s\n", monome_get_serial(state.monome),
+		   monome_get_devpath(monome));
 
 	monome_set_orientation(state.monome, MONOME_CABLE_LEFT);
 	monome_clear(state.monome, MONOME_CLEAR_OFF);
@@ -79,19 +75,17 @@ err_nomem:
 	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
-err_lo_server:
-	monome_close(state.monome);
 }
 
 int main(int argc, char **argv) {
-	const char *device;
+	monome_t *device;
 
 	if( !(device = next_device()) )
 		exit(EXIT_FAILURE);
 
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
 	router_process(device);
-	free((char *) device);
+	monome_close(device);
 
 	return EXIT_SUCCESS;
 }
