@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <string.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,19 +41,22 @@ static void lo_error(int num, const char *error_msg, const char *path) {
 }
 
 void router_process(const char *device) {
-	sosc_state_t state = { .osc_prefix = DEFAULT_OSC_PREFIX };
+	sosc_state_t state;
 
 	if( !(state.monome = monome_open(device)) ) {
 		printf("failed opening %s\n", device);
 		return;
 	}
 
-	if( !(state.server = lo_server_new("8080", lo_error)) )
+	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
 		goto err_lo_server;
 
 	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_PORT,
 	                                      DEFAULT_OSC_APP_HOST)) )
 		goto err_lo_addr;
+
+	if( !(state.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) )
+		goto err_nomem;
 
 	DNSServiceRegister(&state.ref, 0, 0, monome_get_serial(state.monome),
 	                   "_monome-osc._udp", NULL, NULL,
@@ -64,10 +68,14 @@ void router_process(const char *device) {
 	monome_mode(state.monome, MONOME_MODE_NORMAL);
 
 	osc_register_sys_methods(&state);
+	osc_register_methods(&state);
+
 	osc_event_loop(&state);
 
 	printf(" <= %s\n", monome_get_serial(state.monome));
 	DNSServiceRefDeallocate(state.ref);
+
+err_nomem:
 	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
