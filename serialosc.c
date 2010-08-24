@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include <lo/lo.h>
 #include <dns_sd.h>
@@ -53,7 +54,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 void router_process(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
-	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
+	if( !(state.server = lo_server_new(NULL, lo_error)) )
 		return;
 
 	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_HOST,
@@ -63,9 +64,11 @@ void router_process(monome_t *monome) {
 	if( !(state.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) )
 		goto err_nomem;
 
-	DNSServiceRegister(&state.ref, 0, 0, monome_get_serial(state.monome),
-	                   "_monome-osc._udp", NULL, NULL,
-	                   lo_server_get_port(state.server), 0, NULL, NULL, NULL);
+	DNSServiceRegister(
+		&state.ref, 0, 0, monome_get_serial(state.monome), "_monome-osc._udp",
+		NULL, NULL, htons(lo_server_get_port(state.server)), 0, NULL, NULL,
+		NULL);
+
 	printf(" => %s at %s\n", monome_get_serial(state.monome),
 		   monome_get_devpath(monome));
 
