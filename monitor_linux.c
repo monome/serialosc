@@ -93,7 +93,7 @@ monome_t *next_connected_device(struct udev *u) {
 	cursor = udev_enumerate_get_list_entry(ue);
 
 	for( cursor = udev_enumerate_get_list_entry(ue); cursor;
-		 cursor = udev_list_entry_get_next(cursor), device = NULL ) {
+	     cursor = udev_list_entry_get_next(cursor), device = NULL ) {
 
 		ud = udev_device_new_from_syspath(u, udev_list_entry_get_name(cursor));
 		devnode = strdup(udev_device_get_devnode(ud));
