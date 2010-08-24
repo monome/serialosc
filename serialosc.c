@@ -46,8 +46,8 @@ void router_process(monome_t *monome) {
 	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
 		return;
 
-	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_PORT,
-	                                      DEFAULT_OSC_APP_HOST)) )
+	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_HOST,
+	                                      DEFAULT_OSC_APP_PORT)) )
 		goto err_lo_addr;
 
 	if( !(state.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) )

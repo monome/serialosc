@@ -14,7 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define _GNU_SOURCE /* for asprintf */
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <poll.h>
 
@@ -25,8 +27,23 @@
 #include "osc.h"
 
 
+static void handle_press(const monome_event_t *e, void *data) {
+	sosc_state_t *state = data;
+	char *cmd;
+
+	asprintf(&cmd, "%s/press", state->osc_prefix);
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
+	             e->x, e->y, e->event_type);
+	free(cmd);
+}
+
 int osc_event_loop(const sosc_state_t *state) {
 	struct pollfd fds[2];
+
+	monome_register_handler(state->monome, MONOME_BUTTON_DOWN,
+	                        handle_press, (void *) state);
+	monome_register_handler(state->monome, MONOME_BUTTON_UP,
+	                        handle_press, (void *) state);
 
 	fds[0].fd = monome_get_fd(state->monome);
 	fds[1].fd = lo_server_get_socket_fd(state->server);
