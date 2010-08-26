@@ -104,6 +104,9 @@ static int osc_frame_handler(const char *path, const char *types,
 	return -1;
 }
 
+#define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
+						  free(cmd_buf), cmd_buf = NULL )
+
 void osc_register_methods(sosc_state_t *state) {
 	char *prefix, *cmd_buf;
 	monome_t *monome;
@@ -113,12 +116,8 @@ void osc_register_methods(sosc_state_t *state) {
 	monome = state->monome;
 	srv = state->server;
 
-#define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
-						  free(cmd_buf), cmd_buf = NULL )
-
 #define REGISTER(typetags, cb) \
 	lo_server_add_method(srv, cmd_buf, typetags, cb, monome)
-
 
 	METHOD("clear") {
 		REGISTER("", osc_clear_handler);
@@ -149,5 +148,49 @@ void osc_register_methods(sosc_state_t *state) {
 	}
 
 #undef REGISTER
-#undef METHOD
 }
+
+void osc_unregister_methods(sosc_state_t *state) {
+	char *prefix, *cmd_buf;
+	monome_t *monome;
+	lo_server srv;
+
+	prefix = state->osc_prefix;
+	monome = state->monome;
+	srv = state->server;
+
+#define UNREGISTER(typetags) \
+	lo_server_del_method(srv, cmd_buf, typetags)
+
+	METHOD("clear") {
+		UNREGISTER("");
+		UNREGISTER("i");
+	}
+
+	METHOD("intensity") {
+		UNREGISTER("");
+		UNREGISTER("i");
+	}
+
+	METHOD("led")
+		UNREGISTER("iii");
+
+	METHOD("led_row") {
+		UNREGISTER("ii");
+		UNREGISTER("iii");
+	}
+
+	METHOD("led_col") {
+		UNREGISTER("ii");
+		UNREGISTER("iii");
+	}
+
+	METHOD("frame") {
+		UNREGISTER("iiiiiiii");
+		UNREGISTER("iiiiiiiii");
+	}
+
+#undef UNREGISTER
+}
+
+#undef METHOD

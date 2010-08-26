@@ -14,7 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define _GNU_SOURCE /* for asprintf */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <lo/lo.h>
 #include <monome.h>
@@ -127,6 +130,34 @@ static int sys_host_handler(const char *path, const char *types,
 	return 0;
 }
 
+static int sys_prefix_handler(const char *path, const char *types,
+                              lo_arg **argv, int argc,
+                              lo_message data, void *user_data) {
+	sosc_state_t *state = user_data;
+	char *new, *old = state->osc_prefix;
+
+	new = &argv[0]->s;
+
+	if( argv[0]->s != '/' )
+		/* prepend a slash */
+		asprintf(&new, "/%s", &argv[0]->s);
+	else
+		new = strdup(&argv[0]->s);
+
+	osc_unregister_methods(state);
+	state->osc_prefix = new;
+	osc_register_methods(state);
+
+	/*
+	 * question: how do we notify applications of the new prefix?
+	 * there's no {prefix}/prefix command, only /sys/prefix
+	 */
+
+	free(old);
+
+	return 0;
+}
+
 void osc_register_sys_methods(sosc_state_t *state) {
 	char *cmd;
 
@@ -148,6 +179,9 @@ void osc_register_sys_methods(sosc_state_t *state) {
 
 	METHOD("host")
 		REGISTER("s", sys_host_handler, state);
+
+	METHOD("prefix")
+		REGISTER("s", sys_prefix_handler, state);
 
 #undef REGISTER
 #undef METHOD

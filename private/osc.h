@@ -17,7 +17,9 @@
 #include "serialosc.h"
 
 void osc_register_sys_methods(sosc_state_t *state);
+
 void osc_register_methods(sosc_state_t *state);
+void osc_unregister_methods(sosc_state_t *state);
 
 char *osc_path(const char *path, const char *prefix);
 int osc_event_loop(const sosc_state_t *state);
