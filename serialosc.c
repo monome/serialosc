@@ -45,7 +45,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 	sosc_state_t *state = data;
 	char *cmd;
 
-	asprintf(&cmd, "%s/press", state->osc_prefix);
+	cmd = osc_path("press", state->osc_prefix);
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
 	             e->x, e->y, e->event_type);
 	free(cmd);

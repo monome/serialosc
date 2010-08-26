@@ -108,15 +108,16 @@ static int osc_frame_handler(const char *path, const char *types,
 }
 
 
-static int exit_if_false(int condition) {
-	if( condition )
-		return 1;
+char *osc_path(const char *path, const char *prefix) {
+	char *buf;
 
-	fprintf(stderr, "aieee, could not allocate memory in "
-			"osc_register_methods(), bailing out!\n");
-	_exit(EXIT_FAILURE);
+	if( asprintf(&buf, "%s/%s", prefix, path) < 0 ) {
+		fprintf(stderr, "aieee, could not allocate memory in "
+				"osc_path(), bailing out!\n");
+		_exit(EXIT_FAILURE);
+	}
 
-	return 0;
+	return buf;
 }
 
 void osc_register_methods(sosc_state_t *state) {
@@ -128,9 +129,8 @@ void osc_register_methods(sosc_state_t *state) {
 	monome = state->monome;
 	srv = state->server;
 
-#define METHOD(path) for( cmd_buf = NULL,\
-		 exit_if_false(asprintf(&cmd_buf, "%s/" path, prefix) > 0); \
-		 cmd_buf; free(cmd_buf), cmd_buf = NULL )
+#define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
+						  free(cmd_buf), cmd_buf = NULL )
 
 #define REGISTER(typetags, cb) \
 	lo_server_add_method(srv, cmd_buf, typetags, cb, monome)
