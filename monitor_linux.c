@@ -44,7 +44,8 @@ static void disable_subproc_waiting() {
 static monome_t *event_loop(struct udev_monitor *um) {
 	struct udev_device *ud;
 	struct pollfd fds[1];
-	const char *device;
+	monome_t *device;
+	char *devnode;
 
 	fds[0].fd = udev_monitor_get_fd(um);
 	fds[0].events = POLLIN;
@@ -70,11 +71,14 @@ static monome_t *event_loop(struct udev_monitor *um) {
 			continue;
 		}
 
-		device = strdup(udev_device_get_devnode(ud));
+		devnode = strdup(udev_device_get_devnode(ud));
 		udev_device_unref(ud);
 
-		if( !fork() )
-			return monome_open(device);
+		if( !fork() ) {
+			device = monome_open(devnode);
+			free(devnode);
+			return device;
+		}
 	} while( 1 );
 }
 
@@ -82,7 +86,6 @@ monome_t *next_connected_device(struct udev *u) {
 	struct udev_list_entry *cursor;
 	struct udev_enumerate *ue;
 	struct udev_device *ud;
-	const char *devnode = NULL;
 	monome_t *device = NULL;
 
 	if( !(ue = udev_enumerate_new(u)) )
@@ -97,14 +100,17 @@ monome_t *next_connected_device(struct udev *u) {
 	     cursor = udev_list_entry_get_next(cursor), device = NULL ) {
 
 		ud = udev_device_new_from_syspath(u, udev_list_entry_get_name(cursor));
-		devnode = strdup(udev_device_get_devnode(ud));
+		device = monome_open(udev_device_get_devnode(ud));
 		udev_device_unref(ud);
 
-		if( !(device = monome_open(devnode)) )
+		if( !device )
 			continue;
 
 		if( !fork() )
 			break;
+
+		/* executed in the parent process, fixes a memory leak */
+		monome_close(device);
 	}
 
 	udev_enumerate_unref(ue);

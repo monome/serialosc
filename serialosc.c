@@ -89,6 +89,7 @@ void router_process(monome_t *monome) {
 	printf(" <= %s\n", monome_get_serial(state.monome));
 	DNSServiceRefDeallocate(state.ref);
 
+	free(state.osc_prefix);
 err_nomem:
 	lo_address_free(state.outgoing);
 err_lo_addr:
