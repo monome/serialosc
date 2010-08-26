@@ -23,6 +23,18 @@
 #include "osc.h"
 
 
+static int portstr(char *dest, int src) {
+	return snprintf(dest, 6, "%d", src);
+}
+
+static void send_info(lo_address *to, sosc_state_t *state) {
+	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/info", "siis",
+	             monome_get_serial(state->monome),
+	             monome_get_rows(state->monome),
+	             monome_get_cols(state->monome),
+	             state->osc_prefix);
+}
+
 static int sys_mode_handler(const char *path, const char *types,
                             lo_arg **argv, int argc,
                             lo_message data, void *user_data) {
@@ -44,26 +56,51 @@ static int sys_info_handler(const char *path, const char *types,
 		/* fall through */
 
 	case 1: /* port, localhost is assumed */
-		snprintf(port, 6, "%d", argv[argc - 1]->i);
+		portstr(port, argv[argc - 1]->i);
 
 		if( !(dst = lo_address_new(host, port)) ) {
-			fprintf(stderr, "sys_info_handler(): could not allocate lo_address");
+			fprintf(stderr, "sys_info_handler(): error in lo_address_new()");
 			return 1;
 		}
 
 		break;
-
-	default: /* send to current application address */
-		dst = state->outgoing;
 	}
 
-	lo_send_from(dst, state->server, LO_TT_IMMEDIATE, "/sys/info", "siis",
-	             monome_get_serial(state->monome),
-	             monome_get_rows(state->monome),
-	             monome_get_cols(state->monome),
-	             state->osc_prefix);
-
+	send_info(dst, state);
 	lo_address_free(dst);
+
+	return 0;
+}
+
+static int sys_info_handler_default(const char *path, const char *types,
+                            lo_arg **argv, int argc,
+                            lo_message data, void *user_data) {
+	sosc_state_t *state = user_data;
+	send_info(state->outgoing, state);
+	return 0;
+}
+
+static int sys_port_handler(const char *path, const char *types,
+                            lo_arg **argv, int argc,
+                            lo_message data, void *user_data) {
+	sosc_state_t *state = user_data;
+	lo_address *new, *old = state->outgoing;
+	char port[6];
+
+	portstr(port, argv[0]->i);
+
+	if( !(new = lo_address_new(lo_address_get_hostname(old), port)) ) {
+		fprintf(stderr, "sys_port_handler(): error in lo_address_new()\n");
+		return 1;
+	}
+
+	lo_send_from(old, state->server, LO_TT_IMMEDIATE,
+	             "/sys/port", "i", argv[0]->i);
+	lo_send_from(new, state->server, LO_TT_IMMEDIATE,
+				 "/sys/port", "i", argv[0]->i);
+
+	state->outgoing = new;
+	lo_address_free(old);
 
 	return 0;
 }
@@ -81,8 +118,11 @@ void osc_register_sys_methods(sosc_state_t *state) {
 	METHOD("info") {
 		REGISTER("si", sys_info_handler, state);
 		REGISTER("i", sys_info_handler, state);
-		REGISTER("", sys_info_handler, state);
+		REGISTER("", sys_info_handler_default, state);
 	}
+
+	METHOD("port")
+		REGISTER("i", sys_port_handler, state);
 
 #undef REGISTER
 #undef METHOD
