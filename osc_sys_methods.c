@@ -105,6 +105,28 @@ static int sys_port_handler(const char *path, const char *types,
 	return 0;
 }
 
+static int sys_host_handler(const char *path, const char *types,
+                            lo_arg **argv, int argc,
+                            lo_message data, void *user_data) {
+	sosc_state_t *state = user_data;
+	lo_address *new, *old = state->outgoing;
+
+	if( !(new = lo_address_new(&argv[0]->s, lo_address_get_port(old))) ) {
+		fprintf(stderr, "sys_host_handler(): error in lo_address_new()\n");
+		return 1;
+	}
+
+	lo_send_from(old, state->server, LO_TT_IMMEDIATE,
+	             "/sys/host", "s", &argv[0]->s);
+	lo_send_from(new, state->server, LO_TT_IMMEDIATE,
+	             "/sys/host", "s", &argv[0]->s);
+
+	state->outgoing = new;
+	lo_address_free(old);
+
+	return 0;
+}
+
 void osc_register_sys_methods(sosc_state_t *state) {
 	char *cmd;
 
@@ -123,6 +145,9 @@ void osc_register_sys_methods(sosc_state_t *state) {
 
 	METHOD("port")
 		REGISTER("i", sys_port_handler, state);
+
+	METHOD("host")
+		REGISTER("s", sys_host_handler, state);
 
 #undef REGISTER
 #undef METHOD
