@@ -37,7 +37,7 @@
 
 static void lo_error(int num, const char *error_msg, const char *path) {
 	fprintf(stderr, "serialosc: lo server error %d in %s: %s\n",
-		   num, path, error_msg);
+	        num, path, error_msg);
 	fflush(stderr);
 }
 
@@ -73,7 +73,7 @@ void router_process(monome_t *monome) {
 		   monome_get_devpath(monome));
 
 	monome_register_handler(state.monome, MONOME_BUTTON_DOWN,
-                            handle_press, &state);
+	                        handle_press, &state);
 	monome_register_handler(state.monome, MONOME_BUTTON_UP,
 	                        handle_press, &state);
 

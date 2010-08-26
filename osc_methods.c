@@ -24,8 +24,8 @@
 
 
 static int osc_clear_handler(const char *path, const char *types,
-							 lo_arg **argv, int argc,
-							 lo_message data, void *user_data) {
+                             lo_arg **argv, int argc,
+                             lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 	int mode = (argc) ? argv[0]->i : 0;
 
@@ -33,8 +33,8 @@ static int osc_clear_handler(const char *path, const char *types,
 }
 
 static int osc_intensity_handler(const char *path, const char *types,
-								 lo_arg **argv, int argc,
-								 lo_message data, void *user_data) {
+                                 lo_arg **argv, int argc,
+                                 lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 	int intensity = (argc) ? argv[0]->i : 0xF;
 
@@ -42,8 +42,8 @@ static int osc_intensity_handler(const char *path, const char *types,
 }
 
 static int osc_led_handler(const char *path, const char *types,
-						   lo_arg **argv, int argc,
-						   lo_message data, void *user_data) {
+                           lo_arg **argv, int argc,
+                           lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 
 	if( argv[2]->i )
@@ -53,8 +53,8 @@ static int osc_led_handler(const char *path, const char *types,
 }
 
 static int osc_led_col_handler(const char *path, const char *types,
-								   lo_arg **argv, int argc,
-								   lo_message data, void *user_data) {
+                               lo_arg **argv, int argc,
+                               lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 	uint8_t buf[2] = {argv[1]->i};
 
@@ -65,8 +65,8 @@ static int osc_led_col_handler(const char *path, const char *types,
 }
 
 static int osc_led_row_handler(const char *path, const char *types,
-								   lo_arg **argv, int argc,
-								   lo_message data, void *user_data) {
+                               lo_arg **argv, int argc,
+                               lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 	uint8_t buf[2] = {argv[1]->i};
 
@@ -77,8 +77,8 @@ static int osc_led_row_handler(const char *path, const char *types,
 }
 
 static int osc_frame_handler(const char *path, const char *types,
-							 lo_arg **argv, int argc,
-							 lo_message data, void *user_data) {
+                             lo_arg **argv, int argc,
+                             lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 	uint8_t buf[8];
 	uint i;
@@ -105,7 +105,7 @@ static int osc_frame_handler(const char *path, const char *types,
 }
 
 #define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
-						  free(cmd_buf), cmd_buf = NULL )
+                          free(cmd_buf), cmd_buf = NULL )
 
 void osc_register_methods(sosc_state_t *state) {
 	char *prefix, *cmd_buf;
