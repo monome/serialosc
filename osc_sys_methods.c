@@ -35,16 +35,26 @@ static int sys_info_handler(const char *path, const char *types,
                             lo_arg **argv, int argc,
                             lo_message data, void *user_data) {
 	sosc_state_t *state = user_data;
-
+	char port[6], *host = NULL;
 	lo_address *dst;
-	char *host, port[6];
 
-	host = &argv[0]->s;
-	snprintf(port, 6, "%d", argv[1]->i);
+	switch( argc ) {
+	case 2: /* host and port */
+		host = &argv[0]->s;
+		/* fall through */
 
-	if( !(dst = lo_address_new(host, port)) ) {
-		fprintf(stderr, "could not allocate lo_address");
-		return 1;
+	case 1: /* port, localhost is assumed */
+		snprintf(port, 6, "%d", argv[argc - 1]->i);
+
+		if( !(dst = lo_address_new(host, port)) ) {
+			fprintf(stderr, "sys_info_handler(): could not allocate lo_address");
+			return 1;
+		}
+
+		break;
+
+	default: /* send to current application address */
+		dst = state->outgoing;
 	}
 
 	lo_send_from(dst, state->server, LO_TT_IMMEDIATE, "/sys/info", "siis",
@@ -64,6 +74,9 @@ void osc_register_sys_methods(sosc_state_t *state) {
 	                     sys_##method##_handler, context)
 
 	SYS_METHOD(mode, "i", state->monome);
+
+	SYS_METHOD(info, "", state);
+	SYS_METHOD(info, "i", state);
 	SYS_METHOD(info, "si", state);
 
 #undef SYS_METHOD

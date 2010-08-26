@@ -98,6 +98,7 @@ err_lo_addr:
 int main(int argc, char **argv) {
 	monome_t *device;
 
+	/* next_device() either returns on failure or in a subprocess */
 	if( !(device = next_device()) )
 		exit(EXIT_FAILURE);
 

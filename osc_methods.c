@@ -104,7 +104,6 @@ static int osc_frame_handler(const char *path, const char *types,
 	return -1;
 }
 
-
 void osc_register_methods(sosc_state_t *state) {
 	char *prefix, *cmd_buf;
 	monome_t *monome;
