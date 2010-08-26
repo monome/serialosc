@@ -69,15 +69,21 @@ static int sys_info_handler(const char *path, const char *types,
 }
 
 void osc_register_sys_methods(sosc_state_t *state) {
-#define SYS_METHOD(method, types, context) \
-	lo_server_add_method(state->server, "/sys/" #method, types, \
-	                     sys_##method##_handler, context)
+	char *cmd;
 
-	SYS_METHOD(mode, "i", state->monome);
+#define METHOD(path) for( cmd = "/sys/" path; cmd; cmd = NULL )
+#define REGISTER(types, handler, context) \
+	lo_server_add_method(state->server, cmd, types, handler, context)
 
-	SYS_METHOD(info, "", state);
-	SYS_METHOD(info, "i", state);
-	SYS_METHOD(info, "si", state);
+	METHOD("mode")
+		REGISTER("i", sys_mode_handler, state->monome);
 
-#undef SYS_METHOD
+	METHOD("info") {
+		REGISTER("si", sys_info_handler, state);
+		REGISTER("i", sys_info_handler, state);
+		REGISTER("", sys_info_handler, state);
+	}
+
+#undef REGISTER
+#undef METHOD
 }
