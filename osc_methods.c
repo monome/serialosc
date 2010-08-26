@@ -14,10 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define _GNU_SOURCE /* for asprintf */
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include <lo/lo.h>
 #include <monome.h>
@@ -107,18 +104,6 @@ static int osc_frame_handler(const char *path, const char *types,
 	return -1;
 }
 
-
-char *osc_path(const char *path, const char *prefix) {
-	char *buf;
-
-	if( asprintf(&buf, "%s/%s", prefix, path) < 0 ) {
-		fprintf(stderr, "aieee, could not allocate memory in "
-				"osc_path(), bailing out!\n");
-		_exit(EXIT_FAILURE);
-	}
-
-	return buf;
-}
 
 void osc_register_methods(sosc_state_t *state) {
 	char *prefix, *cmd_buf;

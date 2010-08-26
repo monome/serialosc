@@ -14,7 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define _GNU_SOURCE /* for asprintf */
 #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <errno.h>
 #include <poll.h>
 
@@ -24,6 +27,18 @@
 #include "serialosc.h"
 #include "osc.h"
 
+
+char *osc_path(const char *path, const char *prefix) {
+	char *buf;
+
+	if( asprintf(&buf, "%s/%s", prefix, path) < 0 ) {
+		fprintf(stderr, "aieee, could not allocate memory in "
+				"osc_path(), bailing out!\n");
+		_exit(EXIT_FAILURE);
+	}
+
+	return buf;
+}
 
 int osc_event_loop(const sosc_state_t *state) {
 	struct pollfd fds[2];
