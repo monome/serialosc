@@ -46,6 +46,37 @@ static int sys_mode_handler(const char *path, const char *types,
 	return monome_mode(monome, argv[0]->i);
 }
 
+static int sys_cable_handler(const char *path, const char *types,
+                             lo_arg **argv, int argc,
+                             lo_message data, void *user_data) {
+	monome_t *monome = user_data;
+
+	switch( argv[0]->s ) {
+	case 'L':
+	case 'l':
+		monome_set_orientation(monome, MONOME_CABLE_LEFT);
+		return 0;
+
+	case 'B':
+	case 'b':
+		monome_set_orientation(monome, MONOME_CABLE_BOTTOM);
+		return 0;
+
+	case 'R':
+	case 'r':
+		monome_set_orientation(monome, MONOME_CABLE_RIGHT);
+		return 0;
+
+	case 'T':
+	case 't':
+		monome_set_orientation(monome, MONOME_CABLE_TOP);
+		return 0;
+
+	default:
+		return 1;
+	}
+}
+
 static int sys_info_handler(const char *path, const char *types,
                             lo_arg **argv, int argc,
                             lo_message data, void *user_data) {
@@ -167,6 +198,9 @@ void osc_register_sys_methods(sosc_state_t *state) {
 
 	METHOD("mode")
 		REGISTER("i", sys_mode_handler, state->monome);
+
+	METHOD("cable")
+		REGISTER("s", sys_cable_handler, state->monome);
 
 	METHOD("info") {
 		REGISTER("si", sys_info_handler, state);
