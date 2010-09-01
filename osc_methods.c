@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010 William Light <will@illest.net>
+ * Copyright (c) 2010 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
