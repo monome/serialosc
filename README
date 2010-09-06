@@ -6,14 +6,12 @@
 
    serialosc is an osc router for yr monome
 
-     it is a daemon that waits for you to
-    plug a monome in, then it spawns off a
-     dedicated server process to route OSC
-     messages to and from your monome.  it
-      also advertises a _monome-osc._udp
-       service over zeroconf (bonjour).
+   it is a daemon that waits for you to
+   plug a monome in, then it spawns off a
+   dedicated server process to route OSC
+   messages to and from your monome.  it
+   also advertises a _monome-osc._udp
+   service over zeroconf (bonjour).
 
-            more info to come.
-
-             wrl@illest.net
+                             wrl@illest.net
 

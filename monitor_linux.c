@@ -82,7 +82,7 @@ static monome_t *event_loop(struct udev_monitor *um) {
 	} while( 1 );
 }
 
-monome_t *next_connected_device(struct udev *u) {
+static monome_t *next_connected_device(struct udev *u) {
 	struct udev_list_entry *cursor;
 	struct udev_enumerate *ue;
 	struct udev_device *ud;

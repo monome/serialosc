@@ -16,7 +16,7 @@
 
 #include <monome.h>
 
-/* returns the devpath to a device when it is attached.
+/* returns an initialized monome_t.
    this function returns in a subprocess. */
 
 monome_t *next_device();
