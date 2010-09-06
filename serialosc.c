@@ -90,12 +90,12 @@ void router_process(monome_t *monome) {
 	osc_register_methods(&state);
 
 	printf("serialosc [%s]: connected at %s\n",
-		   monome_get_serial(state.monome), monome_get_devpath(monome));
+	       monome_get_serial(state.monome), monome_get_devpath(monome));
 
 	osc_event_loop(&state);
 
 	printf("serialosc [%s]: disconnected, exiting\n",
-		   monome_get_serial(state.monome));
+	       monome_get_serial(state.monome));
 
 	DNSServiceRefDeallocate(state.ref);
 
