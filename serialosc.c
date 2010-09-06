@@ -58,19 +58,24 @@ void router_process(monome_t *monome) {
 		return;
 
 	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_HOST,
-	                                      DEFAULT_OSC_APP_PORT)) )
+	                                      DEFAULT_OSC_APP_PORT)) ) {
+		fprintf(
+			stderr, "serialosc [%s]: couldn't allocate lo_address, aieee!\n",
+			monome_get_serial(state.monome));
 		goto err_lo_addr;
+	}
 
-	if( !(state.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) )
+	if( !(state.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) ) {
+		fprintf(
+			stderr, "serialosc [%s]: can't strdup(), aieee!\n",
+			monome_get_serial(state.monome));
 		goto err_nomem;
+	}
 
 	DNSServiceRegister(
 		&state.ref, 0, 0, monome_get_serial(state.monome), "_monome-osc._udp",
 		NULL, NULL, htons(lo_server_get_port(state.server)), 0, NULL, NULL,
 		NULL);
-
-	printf(" => %s at %s\n", monome_get_serial(state.monome),
-		   monome_get_devpath(monome));
 
 	monome_register_handler(state.monome, MONOME_BUTTON_DOWN,
 	                        handle_press, &state);
@@ -84,9 +89,14 @@ void router_process(monome_t *monome) {
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
 
+	printf("serialosc [%s]: connected at %s\n",
+		   monome_get_serial(state.monome), monome_get_devpath(monome));
+
 	osc_event_loop(&state);
 
-	printf(" <= %s\n", monome_get_serial(state.monome));
+	printf("serialosc [%s]: disconnected, exiting\n",
+		   monome_get_serial(state.monome));
+
 	DNSServiceRefDeallocate(state.ref);
 
 	free(state.osc_prefix);
