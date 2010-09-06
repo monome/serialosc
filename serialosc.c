@@ -30,7 +30,7 @@
 
 
 #define DEFAULT_OSC_PREFIX      "/monome"
-#define DEFAULT_OSC_SERVER_PORT "8080"
+#define DEFAULT_OSC_SERVER_PORT NULL
 #define DEFAULT_OSC_APP_PORT    "8000"
 #define DEFAULT_OSC_APP_HOST    "127.0.0.1"
 
@@ -54,7 +54,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 void router_process(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
-	if( !(state.server = lo_server_new(NULL, lo_error)) )
+	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
 		return;
 
 	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_HOST,
