@@ -11,9 +11,9 @@
      dedicated server process to route OSC
      messages to and from your monome.  it
       also advertises a _monome-osc._udp
-        over zeroconf (bonjour, avahi).
+	   service over zeroconf (bonjour).
 
-              more info to come.
+             more info to come.
 
-                wrl@illest.net
+              wrl@illest.net
 
