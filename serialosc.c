@@ -89,8 +89,8 @@ void router_process(monome_t *monome) {
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
 
-	printf("serialosc [%s]: connected at %s\n",
-	       monome_get_serial(state.monome), monome_get_devpath(monome));
+	printf("serialosc [%s]: connected, server running on port %d\n",
+	       monome_get_serial(state.monome), lo_server_get_port(state.server));
 
 	osc_event_loop(&state);
 
