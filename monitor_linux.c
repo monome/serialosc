@@ -44,8 +44,9 @@ static void disable_subproc_waiting() {
 static monome_t *event_loop(struct udev_monitor *um) {
 	struct udev_device *ud;
 	struct pollfd fds[1];
-	monome_t *device;
-	char *devnode;
+
+	const char *devnode = NULL;
+	monome_t *device = NULL;
 
 	fds[0].fd = udev_monitor_get_fd(um);
 	fds[0].events = POLLIN;
@@ -66,26 +67,31 @@ static monome_t *event_loop(struct udev_monitor *um) {
 
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
-		if( *(udev_device_get_action(ud)) != 'a' ) {
-			udev_device_unref(ud);
-			continue;
-		}
+		if( *(udev_device_get_action(ud)) != 'a' )
+			goto next;
 
-		devnode = strdup(udev_device_get_devnode(ud));
-		udev_device_unref(ud);
+		devnode = udev_device_get_devnode(ud);
 
 		if( !fork() ) {
 			device = monome_open(devnode);
-			free(devnode);
-			return device;
+
+			udev_device_unref(ud);
+			break;
 		}
+
+next:
+		udev_device_unref(ud);
 	} while( 1 );
+
+	return device;
 }
 
 static monome_t *next_connected_device(struct udev *u) {
 	struct udev_list_entry *cursor;
 	struct udev_enumerate *ue;
 	struct udev_device *ud;
+
+	const char *devnode = NULL;
 	monome_t *device = NULL;
 
 	if( !(ue = udev_enumerate_new(u)) )
@@ -94,23 +100,20 @@ static monome_t *next_connected_device(struct udev *u) {
 	udev_enumerate_add_match_subsystem(ue, "tty");
 	udev_enumerate_add_match_property(ue, "ID_BUS", "usb");
 	udev_enumerate_scan_devices(ue);
-	cursor = udev_enumerate_get_list_entry(ue);
 
 	for( cursor = udev_enumerate_get_list_entry(ue); cursor;
-	     cursor = udev_list_entry_get_next(cursor), device = NULL ) {
+		 cursor = udev_list_entry_get_next(cursor), device = NULL ) {
 
 		ud = udev_device_new_from_syspath(u, udev_list_entry_get_name(cursor));
-		device = monome_open(udev_device_get_devnode(ud));
-		udev_device_unref(ud);
 
-		if( !device )
-			continue;
+		if( (devnode = udev_device_get_devnode(ud)) && !fork() ) {
+			device = monome_open(devnode);
 
-		if( !fork() )
+			udev_device_unref(ud);
 			break;
+		}
 
-		/* executed in the parent process, fixes a memory leak */
-		monome_close(device);
+		udev_device_unref(ud);
 	}
 
 	udev_enumerate_unref(ue);
