@@ -33,7 +33,7 @@
 #define DEFAULT_OSC_SERVER_PORT NULL
 #define DEFAULT_OSC_APP_PORT    "8000"
 #define DEFAULT_OSC_APP_HOST    "127.0.0.1"
-#define DEFAULT_ROTATION        MONOME_CABLE_LEFT
+#define DEFAULT_ROTATION        MONOME_ROTATE_0
 
 
 static void lo_error(int num, const char *error_msg, const char *path) {
@@ -83,7 +83,7 @@ void router_process(monome_t *monome) {
 	monome_register_handler(state.monome, MONOME_BUTTON_UP,
 	                        handle_press, &state);
 
-	monome_set_orientation(state.monome, DEFAULT_ROTATION);
+	monome_set_rotation(state.monome, DEFAULT_ROTATION);
 	monome_clear(state.monome, MONOME_CLEAR_OFF);
 	monome_mode(state.monome, MONOME_MODE_NORMAL);
 
