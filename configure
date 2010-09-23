@@ -1,0 +1,494 @@
+#!/bin/bash
+
+#
+# Copyright (c) 2010 William Light <wrl@illest.net>
+# 
+# Permission to use, copy, modify, and/or distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+#
+# variables and such
+#
+
+PROJECT="serialosc";
+VERSION="1.0a";
+
+CC="gcc";
+LD="\$(CC)";
+CC_VERSION=;
+
+CFLAGS="-ggdb";
+LDFLAGS="-ggdb";
+
+PKGCONFIG_VERSION=;
+
+PLATFORM=;
+PLATFORM_VERSION=;
+PREFIX="/usr/local";
+MANDIR=;
+LIBUDEV_VERSION=;
+
+LIBMONOME_VERSION=;
+LIBMONOME_PREFIX=$PREFIX;
+LIBMONOME_CFLAGS=;
+LIBMONOME_LDFLAGS="-lmonome";
+
+LO_VERSION=;
+LO_PREFIX=$PREFIX;
+LO_CFLAGS="";
+LO_LDFLAGS="-llo -lpthread";
+
+#
+# functions
+#
+
+# figure out the right things to pass to echo to supress a newline
+if [ "`echo -n`" = "-n" ]; then
+	n=""; c="\c";
+else
+	n="-n"; c="";
+fi
+
+_echo () {
+	# portable (sysv/bsd) echo -n
+	if [ $1 = "-n" ]; then
+		shift;
+		echo $n "$*" $c;
+	else
+		echo "$*";
+	fi
+}
+
+echo_n () {
+	_echo -n "$*";
+}
+
+# color and text styles
+
+att() {
+	if [ $# -eq 0 ]; then
+		echo -ne "\033[0m";
+		return 0;
+	fi
+
+	echo -ne "\033["
+	while [ $# -ge 1 ]; do
+		case $1 in
+			bold)      C=1;;
+			underline) C=4;;
+			hidden)    C=8;;
+			
+			black)     C=30;;
+			red)       C=31;;
+			green)     C=32;;
+			yellow)    C=33;;
+			blue)      C=34;;
+			magenta)   C=35;;
+			cyan)      C=36;;
+			white)     C=37;;
+			
+			reset)
+				echo -ne "0m";
+				return 0;
+		esac
+		
+		echo -ne "$C"
+		
+		if [ $# -ge 2 ]; then
+			echo -ne ";";
+		fi
+		
+		shift;
+	done;
+	echo -ne "m";
+}
+
+style_package () { att blue bold; _echo $*; att; }
+style_success () { att green; _echo $*; att; }
+style_distro  () { att cyan; _echo $*; att; }
+style_error   () { att red bold; _echo $*; att; }
+style_warning () { att yellow bold; echo $*; att; }
+style_link    () { att blue bold underline; _echo $*; att; }
+
+cleanup () {
+	rmdir .conftests
+}
+
+# feature test commands
+
+try_command () {
+	if $* > /dev/null 2> /dev/null; then
+		return 0;
+	else
+		return 1;
+	fi
+}
+
+compile_and_run() {
+	FILE=$1
+	shift;
+	
+	CMD="$CC $CFLAGS $LDFLAGS $* .conftests/$FILE.c -o .conftests/$FILE"
+	try_command $CMD;
+	
+	if [ $? -ne 0 ]; then
+		rm -f .conftests/$FILE.c;
+		rm -f .conftests/$FILE;
+	
+		return 1;
+	fi
+	
+	CMD="./.conftests/$1";
+	try_command $CMD;
+	
+	rm -f .conftests/$FILE.c;
+	rm -f .conftests/$FILE;
+	
+	if [ $? -ne 0 ]; then
+		return 2;
+	fi
+	
+	return 0;
+}
+
+check_pkgconfig () {
+	CMD="pkg-config --version";
+	
+	if try_command $CMD; then
+		PKGCONFIG_VERSION=`$CMD`;
+	fi
+}
+
+get_platform () {
+	try_command "uname";
+
+	if [ $? -ne 0 ]; then
+		PLATFORM="dummy";
+		return 1;
+	fi
+
+	PLATFORM=`uname`;
+	return 0;
+}
+
+check_gcc () {
+	CMD="$CC -dumpversion";
+	try_command $CMD;
+	
+	if [ $? -eq 0 ]; then
+		CC_VERSION=`$CMD`;
+		return 0;
+	fi
+
+	CC_VERSION=;
+	return 1;
+}
+
+check_libudev () {
+	cat <<EOF > .conftests/libudev.c
+#include <libudev.h>
+
+int main(int argc, char **argv) {
+	struct udev *udev = udev_new();
+	udev_unref(udev);
+
+	return 0;
+}
+EOF
+
+	compile_and_run libudev "" "-ludev";
+	RET=$?;
+
+	[ $RET -ne 0 ] && return $RET;
+	
+	if [ $PKGCONFIG_VERSION ]; then
+		CMD="pkg-config --modversion libudev"
+		LIBUDEV_VERSION=`$CMD 2> /dev/null`;
+		
+		[ $? -ne 0 ] && return 0;
+	fi
+
+	return 0;
+}
+
+check_lo () {
+	cat <<EOF > .conftests/lo.c
+#include <lo/lo.h>
+
+int main(int argc, char **argv) {
+	lo_address a = lo_address_new(NULL, NULL);
+	
+	if( !a )
+		return 1;
+	
+	lo_address_free(a);
+	return 0;
+}
+EOF
+
+	compile_and_run lo $LO_CFLAGS $LO_LDFLAGS;
+	RET=$?;
+
+	[ $RET -ne 0 ] && return $RET;
+
+	if [ $PKGCONFIG_VERSION ]; then
+		CMD="pkg-config --modversion liblo"
+		LO_VERSION=`$CMD 2> /dev/null`;
+		
+		[ $? -ne 0 ] && return 0;
+	fi
+
+	return 0;
+}
+
+check_libmonome () {
+	cat <<EOF > .conftests/monome.c
+#include <monome.h>
+
+int main(int argc, char **argv) {
+	monome_open(NULL);
+	return 0;
+}
+EOF
+
+	compile_and_run monome $LIBMONOME_CFLAGS $LIBMONOME_LDFLAGS;
+	RET=$?;
+
+	[ $RET -ne 0 ] && return $RET;
+
+	if [ $PKGCONFIG_VERSION ]; then
+		CMD="pkg-config --modversion libmonome"
+		LIBMONOME_VERSION=`$CMD 2> /dev/null`
+
+		[ $? -ne 0 ] && return 0;
+	fi
+
+	return 0;
+}
+
+fail_if_not_dir () {
+	if [ ! -d $* ]; then
+		echo_n "  "
+		style_error -n $*
+		echo " is not a valid directory."
+		echo ""
+		exit 1
+	fi
+}
+
+usage () {
+	echo ""
+	echo "  usage: ./configure [OPTIONS]"
+	echo ""
+	echo "  options [and defaults] are:"
+	echo "    --prefix=DIR                install files in PREFIX [/usr/local]"
+	echo ""
+	echo "    --lo-prefix=DIR             the prefix under which liblo is installed [/usr/local]"
+	echo "    --libmonome-prefix=DIR      the prefix under which libmonome is installed [/usr/local]"
+	echo ""
+}
+
+#
+# parse args
+#
+
+while [ -n "$1" ]; do
+	arg=`expr "$1" : "[^=]*=\(.*\)"`
+
+	case $1 in 
+		--help|-h)
+			usage;
+			exit 1;;
+
+		--prefix=*)
+			fail_if_not_dir $arg;
+			PREFIX=$arg;;
+
+		--lo-prefix=*)
+			fail_if_not_dir $arg;
+			LO_PREFIX=$arg;;
+	esac
+
+	shift;
+done;
+
+CFLAGS="$CFLAGS -I$PREFIX/include"
+LDFLAGS="$LDFLAGS -L$PREFIX/lib"
+
+LO_CFLAGS="-I$LO_PREFIX/include $LO_CFLAGS"
+LO_LDFLAGS="-L$LO_PREFIX/lib $LO_LDFLAGS"
+
+LIBMONOME_CFLAGS="-I$LIBMONOME_PREFIX/include $LIBMONOME_CFLAGS"
+LIBMONOME_LDFLAGS="-L$LIBMONOME_PREFIX/lib $LIBMONOME_LDFLAGS"
+
+determine_mandir;
+
+#
+# main course
+#
+
+echo "";
+mkdir -p .conftests
+check_pkgconfig;
+
+att bold;
+echo_n "  configuring "; style_package -n $PROJECT; att; att bold; echo " ${VERSION}:";
+att;
+
+echo_n "    checking platform:            "; 
+get_platform;
+
+case $PLATFORM in 
+	Linux)
+		LIBSUFFIX=so;
+		LM_SUFFIX=so.$VERSION;
+		PLATFORM_VERSION=`uname -r`;
+		;;
+
+	Darwin)
+		LIBSUFFIX=dylib;
+		LM_SUFFIX=dylib;
+		PLATFORM_VERSION=`expr "$(sw_vers 2>&1)" : "[^0-9]*\([0-9.]*\)"`;
+		export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
+		;;
+
+	*)
+		style_error $PLATFORM;
+
+		echo "";
+		echo "  Your platform is not currently supported by ${PROJECT}!  I'm sorry. :(";
+		echo "";
+
+		cleanup;
+		exit 1;
+		;;
+esac
+
+PLATFORM=`echo $PLATFORM | tr A-Z a-z`
+style_success "$PLATFORM $PLATFORM_VERSION"
+
+echo_n "    checking for gcc:             ";
+if check_gcc; then
+	style_success "gcc $CC_VERSION";
+else
+	style_error "no gcc :(";
+
+	echo   "";
+	echo   "  I couldn't find gcc on your system!  you will need it to compile ${PROJECT}.";
+	echo_n "  If you're on "; style_distro -n "Ubuntu"; echo_n ", make sure to grab the "; style_package -n "build-essential"; echo " package.";
+	echo   "  On Mac OS X, you'll need to install the Xcode developer tools or MacPorts.";
+	echo   "";
+
+	cleanup;
+	exit 1;
+fi
+
+if [ $PLATFORM = "linux" ]; then
+	echo_n "    checking for libudev:         ";
+	if check_libudev; then
+		style_success "libudev $LIBUDEV_VERSION";
+		PLATFORM=linux_libudev;
+		LM_LDFLAGS="$LM_LDFLAGS -ludev";
+	else
+		# why the fuck would you run a system this old
+
+		style_error "no, your system is outdated"
+		cleanup;
+		exit 1;
+	fi
+fi
+
+if [ $PLATFORM = "darwin" ]; then
+	echo_n "    checking for macports:        ";
+	if check_macports; then
+		style_success "macports $MACPORTS_VERSION";
+	else
+		style_warning "no, you'll be building everything from source"
+	fi
+fi
+
+conf_liblo() {
+	echo ""
+	echo_n "    checking for liblo:           ";
+	if check_lo; then
+		style_success "liblo $LO_VERSION";
+	else
+		style_error "no liblo :(";
+
+		echo   "";
+		echo   "  I couldn't find liblo on your system!";
+		echo   "";
+		echo_n "  If you're "; att bold; echo_n sure; att; echo " you want to build without OSC, rerun ./configure";
+		echo_n "  with the "; att bold cyan; echo_n "--disable-osc"; att; echo " option."
+		echo   "";
+		echo_n "  If you're on "; style_distro -n "Ubuntu"; echo_n ", make sure you have the "; style_package -n "liblo0-dev "; echo " package installed.";
+		echo_n "  Users of "; style_distro -n "other distros"; echo_n " and "; style_distro -n "Mac OS X"; echo_n " should look for a "; style_package -n "liblo"; echo " package, or";
+		echo_n "  get the source from the liblo homepage at "; style_link -n "http://liblo.sourceforge.net/"; echo ".";
+		echo   "";
+
+		cleanup;
+		exit 1;
+	fi
+}
+
+conf_liblo;
+
+conf_libmonome() {
+	echo_n "    checking for libmonome:       ";
+
+	if check_libmonome; then
+		style_success "libmonome $LIBMONOME_VERSION";
+	else
+		style_error "no libmonome :(";
+	fi
+}
+
+conf_libmonome;
+
+echo "";
+att bold; echo "  options:"; att;
+echo_n "    installation prefix:          ";
+att bold; echo $PREFIX; att;
+
+cat <<EOF > config.mk
+export PROJECT    = $PROJECT
+export VERSION    = $VERSION
+
+export PREFIX     = $PREFIX
+export BINDIR     = $PREFIX/bin
+export LIBDIR     = $PREFIX/lib
+export INCDIR     = $PREFIX/include
+export MANDIR     = $MANDIR
+export PKGCONFIGDIR = \$(LIBDIR)/pkgconfig
+
+export CC         = $CC
+export LD         = $LD
+export CFLAGS     = $CFLAGS
+export LDFLAGS    = $LDFLAGS
+
+export PLATFORM   = $PLATFORM
+export LIBSUFFIX  = $LIBSUFFIX
+
+export LO_CFLAGS  = $LO_CFLAGS
+export LO_LDFLAGS = $LO_LDFLAGS
+
+export LIBMONOME_CFLAGS = $LIBMONOME_CFLAGS
+export LIBMONOME_LDFLAGS = $LIBMONOME_LDFLAGS
+EOF
+
+echo "";
+echo_n "  run "; style_package -n "make"; echo " to compile ${PROJECT}.";
+echo "";
+
+cleanup;
+exit 0;

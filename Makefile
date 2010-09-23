@@ -1,23 +1,38 @@
-CC = gcc
-LD = $(CC)
+SHELL = /bin/sh
 
-CFLAGS = -ggdb -Wall -Werror -I./private
-LDFLAGS = -ludev -ldns_sd -lmonome -llo
+include config.mk
 
-SERIALOSC_OBJS  = serialosc.o
-SERIALOSC_OBJS += monitor_linux.o
+export CFLAGS  += -Wall -Werror -fPIC -DVERSION=\"$(VERSION)\" -DLIBSUFFIX=\".$(LIBSUFFIX)\" -DLIBDIR=\"$(LIBDIR)\"
+export LDFLAGS += -L$(LIBDIR) -Wl,-rpath,$(LIBDIR)
+export INSTALL = install
 
-SERIALOSC_OBJS += osc.o
-SERIALOSC_OBJS += osc_methods.o
-SERIALOSC_OBJS += osc_sys_methods.o
+SUBDIRS = src
 
-all: serialosc
+.SILENT:
+.SUFFIXES:
+.SUFFIXES: .c .o
+.PHONY: all clean install config.mk
+
+all:
+	cd src; $(MAKE)
 
 clean:
-	rm -f serialosc *.o
+	cd src; $(MAKE) clean
 
-serialosc: $(SERIALOSC_OBJS)
-	$(LD) $(LDFLAGS) -o $@ $(SERIALOSC_OBJS)
+distclean: clean
+	rm -f config.mk
 
-.c.o:
-	$(CC) $(CFLAGS) -c $< -o $@
+install:
+	cd src; $(MAKE) install
+
+config.mk:
+	if [ ! -f config.mk ]; then \
+	echo ;\
+	echo "  _                " ;\
+	echo " | |__   ___ _   _ " ;\
+	echo " |  _ \ / _ \ | | |    you need to run " ;\
+	echo " | | | |  __/ |_| |  ./configure first!" ;\
+	echo " |_| |_|\___|\__, |" ;\
+	echo "             |___/ " ;\
+	echo ;\
+	fi
