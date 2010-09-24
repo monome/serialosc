@@ -23,6 +23,7 @@
 #include <poll.h>
 
 #include <libudev.h>
+#include <monome.h>
 
 #include "serialosc.h"
 #include "monitor.h"
@@ -41,7 +42,7 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static monome_t *event_loop(struct udev_monitor *um) {
+static monome_t *monitor_attach(struct udev_monitor *um) {
 	struct udev_device *ud;
 	struct pollfd fds[1];
 
@@ -76,17 +77,15 @@ static monome_t *event_loop(struct udev_monitor *um) {
 			device = monome_open(devnode);
 
 			udev_device_unref(ud);
-			break;
+			return device;
 		}
 
 next:
 		udev_device_unref(ud);
 	} while( 1 );
-
-	return device;
 }
 
-static monome_t *next_connected_device(struct udev *u) {
+static monome_t *scan_connected_devices(struct udev *u) {
 	struct udev_list_entry *cursor;
 	struct udev_enumerate *ue;
 	struct udev_device *ud;
@@ -100,21 +99,16 @@ static monome_t *next_connected_device(struct udev *u) {
 	udev_enumerate_add_match_subsystem(ue, "tty");
 	udev_enumerate_add_match_property(ue, "ID_BUS", "usb");
 	udev_enumerate_scan_devices(ue);
+	cursor = udev_enumerate_get_list_entry(ue);
 
-	for( cursor = udev_enumerate_get_list_entry(ue); cursor;
-	     cursor = udev_list_entry_get_next(cursor), device = NULL ) {
-
+	do {
 		ud = udev_device_new_from_syspath(u, udev_list_entry_get_name(cursor));
 
-		if( (devnode = udev_device_get_devnode(ud)) && !fork() ) {
+		if( (devnode = udev_device_get_devnode(ud)) && !fork() )
 			device = monome_open(devnode);
 
-			udev_device_unref(ud);
-			break;
-		}
-
 		udev_device_unref(ud);
-	}
+	} while( !device && (cursor = udev_list_entry_get_next(cursor)) );
 
 	udev_enumerate_unref(ue);
 	return device;
@@ -133,8 +127,8 @@ monome_t *next_device() {
 	udev_monitor_filter_add_match_subsystem_devtype(um, "tty", NULL);
 	udev_monitor_enable_receiving(um);
 
-	if( !(device = next_connected_device(u)) )
-		device = event_loop(um);
+	if( !(device = scan_connected_devices(u)) )
+		device = monitor_attach(um);
 
 	udev_monitor_unref(um);
 	udev_unref(u);
