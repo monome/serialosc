@@ -14,7 +14,10 @@ SERIALOSC_OBJS += osc_sys_methods.o
 all: serialosc
 
 install:
-	#echo "  INSTALL src"
+	$(INSTALL) -d $(BINDIR)
+
+	echo "  INSTALL src/serialosc -> $(BINDIR)/serialosc"
+	$(INSTALL) serialosc $(BINDIR)/serialosc
 
 clean:
 	echo "  CLEAN   src"
