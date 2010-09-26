@@ -36,3 +36,5 @@ config.mk:
 	echo "             |___/ " ;\
 	echo ;\
 	fi
+
+	[ -f config.mk ]
