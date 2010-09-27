@@ -351,16 +351,14 @@ get_platform;
 case $PLATFORM in 
 	Linux)
 		LIBSUFFIX=so;
-		LM_SUFFIX=so.$VERSION;
 		PLATFORM_VERSION=`uname -r`;
 		;;
 
-	Darwin)
-		LIBSUFFIX=dylib;
-		LM_SUFFIX=dylib;
-		PLATFORM_VERSION=`expr "$(sw_vers 2>&1)" : "[^0-9]*\([0-9.]*\)"`;
-		export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
-		;;
+	#Darwin)
+	#	LIBSUFFIX=dylib;
+	#	PLATFORM_VERSION=`expr "$(sw_vers 2>&1)" : "[^0-9]*\([0-9.]*\)"`;
+	#	export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
+	#	;;
 
 	*)
 		style_error $PLATFORM;
