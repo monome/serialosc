@@ -1,7 +1,7 @@
 CC = gcc
 LD = $(CC)
 
-CFLAGS = -ggdb -Wall -Werror -I./private
+CFLAGS = -I./private
 LDFLAGS = -ludev -ldns_sd -lmonome -llo
 
 SERIALOSC_OBJS  = serialosc.o
