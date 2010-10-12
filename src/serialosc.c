@@ -93,7 +93,7 @@ void router_process(monome_t *monome) {
 	printf("serialosc [%s]: connected, server running on port %d\n",
 	       monome_get_serial(state.monome), lo_server_get_port(state.server));
 
-	osc_event_loop(&state);
+	event_loop(&state);
 
 	printf("serialosc [%s]: disconnected, exiting\n",
 	       monome_get_serial(state.monome));

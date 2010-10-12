@@ -31,4 +31,6 @@ typedef struct {
 	char *osc_prefix;
 } sosc_state_t;
 
+int event_loop(const sosc_state_t *state);
+
 #endif /* defined __SERIALOSC_H_ */

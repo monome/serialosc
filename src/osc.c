@@ -40,7 +40,7 @@ char *osc_path(const char *path, const char *prefix) {
 	return buf;
 }
 
-int osc_event_loop(const sosc_state_t *state) {
+int event_loop(const sosc_state_t *state) {
 	struct pollfd fds[2];
 
 	fds[0].fd = monome_get_fd(state->monome);
