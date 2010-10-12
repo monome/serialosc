@@ -377,7 +377,7 @@ case $PLATFORM in
 	Linux)
 		LIBSUFFIX=so;
 		PLATFORM_VERSION=`uname -r`;
-		LDFLAGS="$LDFLAGS -ldns_sd"
+		LDFLAGS="-Wl,-rpath,\$(LIBDIR) $LDFLAGS -ldns_sd"
 		;;
 
 	Darwin)

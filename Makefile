@@ -3,7 +3,7 @@ SHELL = /bin/sh
 include config.mk
 
 export CFLAGS  += -ggdb -Wall -Werror -fPIC -DVERSION=\"$(VERSION)\" -DLIBSUFFIX=\".$(LIBSUFFIX)\" -DLIBDIR=\"$(LIBDIR)\"
-export LDFLAGS += -L$(LIBDIR) -Wl,-rpath,$(LIBDIR)
+export LDFLAGS += -L$(LIBDIR)
 export INSTALL = install
 
 SUBDIRS = src
