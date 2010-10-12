@@ -1,8 +1,5 @@
-CC = gcc
-LD = $(CC)
-
-CFLAGS = -I./private
-LDFLAGS = -ldns_sd -lmonome -llo
+CFLAGS += -I./private $(LO_CFLAGS) $(LIBMONOME_CFLAGS)
+LDFLAGS += $(LO_LDFLAGS) $(LIBMONOME_LDFLAGS)
 
 SERIALOSC_OBJS  = serialosc.o
 SERIALOSC_OBJS += osc.o

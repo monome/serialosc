@@ -331,15 +331,19 @@ while [ -n "$1" ]; do
 	case $1 in 
 		--help|-h)
 			usage;
-			exit 1;;
+			exit 1
+			;;
 
 		--prefix=*)
 			fail_if_not_dir $arg;
-			PREFIX=$arg;;
+			PREFIX=$arg
+			;;
 
 		--lo-prefix=*)
 			fail_if_not_dir $arg;
-			LO_PREFIX=$arg;;
+			LO_PREFIX=$arg
+			;;
+
 	esac
 
 	shift;
@@ -373,6 +377,7 @@ case $PLATFORM in
 	Linux)
 		LIBSUFFIX=so;
 		PLATFORM_VERSION=`uname -r`;
+		LDFLAGS="$LDFLAGS -ldns_sd"
 		;;
 
 	Darwin)
