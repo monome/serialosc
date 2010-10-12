@@ -5,7 +5,7 @@ CFLAGS = -I./private
 LDFLAGS = -ludev -ldns_sd -lmonome -llo
 
 SERIALOSC_OBJS  = serialosc.o
-SERIALOSC_OBJS += monitor_linux.o
+SERIALOSC_OBJS += monitor/linux_libudev.o
 
 SERIALOSC_OBJS += osc.o
 SERIALOSC_OBJS += osc_methods.o
