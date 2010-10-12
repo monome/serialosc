@@ -139,27 +139,22 @@ try_command () {
 compile_and_run() {
 	FILE=$1
 	shift;
-	
+
 	CMD="$CC $CFLAGS $LDFLAGS $* .conftests/$FILE.c -o .conftests/$FILE"
 	try_command $CMD;
-	
-	if [ $? -ne 0 ]; then
-		rm -f .conftests/$FILE.c;
-		rm -f .conftests/$FILE;
-	
-		return 1;
-	fi
-	
-	CMD="./.conftests/$1";
-	try_command $CMD;
-	
+	RET=$?;
+
 	rm -f .conftests/$FILE.c;
+
+	[ $RET -ne 0 ] && return 1;
+
+	CMD="./.conftests/$FILE";
+	try_command $CMD;
+	RET=$?;
+
 	rm -f .conftests/$FILE;
-	
-	if [ $? -ne 0 ]; then
-		return 2;
-	fi
-	
+
+	[ $RET -ne 0 ] && return 2;
 	return 0;
 }
 
