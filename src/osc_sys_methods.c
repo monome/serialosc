@@ -30,14 +30,6 @@ static int portstr(char *dest, int src) {
 	return snprintf(dest, 6, "%d", src);
 }
 
-static void send_info(lo_address *to, sosc_state_t *state) {
-	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/info", "siis",
-	             monome_get_serial(state->monome),
-	             monome_get_rows(state->monome),
-	             monome_get_cols(state->monome),
-	             state->osc_prefix);
-}
-
 static int sys_mode_handler(const char *path, const char *types,
                             lo_arg **argv, int argc,
                             lo_message data, void *user_data) {
@@ -91,9 +83,16 @@ static int sys_rotation_handler(const char *path, const char *types,
 	case 90:  monome_set_rotation(monome, MONOME_ROTATE_90);  return 0;
 	case 180: monome_set_rotation(monome, MONOME_ROTATE_180); return 0;
 	case 270: monome_set_rotation(monome, MONOME_ROTATE_270); return 0;
-
 	default:  return 1;
 	}
+}
+
+static void send_info(lo_address *to, sosc_state_t *state) {
+	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/info", "siis",
+	             monome_get_serial(state->monome),
+	             monome_get_rows(state->monome),
+	             monome_get_cols(state->monome),
+	             state->osc_prefix);
 }
 
 static int sys_info_handler(const char *path, const char *types,
@@ -103,20 +102,12 @@ static int sys_info_handler(const char *path, const char *types,
 	char port[6], *host = NULL;
 	lo_address *dst;
 
-	switch( argc ) {
-	case 2: /* host and port */
-		host = &argv[0]->s;
-		/* fall through */
+	host = ( argc == 2 ) ? &argv[0]->s : NULL;
+	portstr(port, argv[argc - 1]->i);
 
-	case 1: /* port, localhost is assumed */
-		portstr(port, argv[argc - 1]->i);
-
-		if( !(dst = lo_address_new(host, port)) ) {
-			fprintf(stderr, "sys_info_handler(): error in lo_address_new()");
-			return 1;
-		}
-
-		break;
+	if( !(dst = lo_address_new(host, port)) ) {
+		fprintf(stderr, "sys_info_handler(): error in lo_address_new()");
+		return 1;
 	}
 
 	send_info(dst, state);
