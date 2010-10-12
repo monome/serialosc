@@ -430,7 +430,7 @@ if [ $PLATFORM = "linux" ]; then
 	if check_libudev; then
 		style_success "libudev $LIBUDEV_VERSION";
 		PLATFORM=linux_libudev;
-		LM_LDFLAGS="$LM_LDFLAGS -ludev";
+		LDFLAGS="$LDFLAGS -ludev";
 	else
 		# why the fuck would you run a system this old
 
