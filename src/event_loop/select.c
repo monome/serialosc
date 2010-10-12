@@ -54,10 +54,10 @@ int event_loop(const sosc_state_t *state) {
 
 		/* is there data available for reading from the monome? */
 		if( FD_ISSET(mfd, &rfds) )
-			monome_event_handle_next(state.monome);
+			monome_event_handle_next(state->monome);
 
 		/* how about from OSC? */
 		if( FD_ISSET(lofd, &rfds) )
-			lo_server_recv_noblock(state.server, 0);
+			lo_server_recv_noblock(state->server, 0);
 	} while( 1 );
 }
