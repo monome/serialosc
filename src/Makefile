@@ -5,11 +5,12 @@ CFLAGS = -I./private
 LDFLAGS = -ludev -ldns_sd -lmonome -llo
 
 SERIALOSC_OBJS  = serialosc.o
-SERIALOSC_OBJS += monitor/$(PLATFORM).o
-
 SERIALOSC_OBJS += osc.o
 SERIALOSC_OBJS += osc_methods.o
 SERIALOSC_OBJS += osc_sys_methods.o
+
+SERIALOSC_OBJS += monitor/$(PLATFORM).o
+SERIALOSC_OBJS += event_loop/$(EVLOOP).o
 
 all: serialosc
 
