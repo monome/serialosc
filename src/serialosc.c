@@ -52,6 +52,15 @@ static void handle_press(const monome_event_t *e, void *data) {
 	free(cmd);
 }
 
+void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
+                   DNSServiceErrorType errorCode, const char *name,
+                   const char *regtype, const char *domain, void *context) {
+
+	/* on OSX, the bonjour library insists on having a callback passed to
+	   DNSServiceRegister. */
+
+}
+
 void router_process(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
@@ -74,9 +83,18 @@ void router_process(monome_t *monome) {
 	}
 
 	DNSServiceRegister(
-		&state.ref, 0, 0, monome_get_serial(state.monome), "_monome-osc._udp",
-		NULL, NULL, htons(lo_server_get_port(state.server)), 0, NULL, NULL,
-		NULL);
+		/* sdref          */ &state.ref,
+		/* interfaceIndex */ 0,
+		/* flags          */ 0,
+		/* name           */ monome_get_serial(state.monome),
+		/* regtype        */ "_monome-osc._udp",
+		/* domain         */ NULL,
+		/* host           */ NULL,
+		/* port           */ htons(lo_server_get_port(state.server)),
+		/* txtLen         */ 0,
+		/* txtRecord      */ NULL,
+		/* callBack       */ mdns_callback,
+		/* context        */ NULL);
 
 	monome_register_handler(state.monome, MONOME_BUTTON_DOWN,
 	                        handle_press, &state);
