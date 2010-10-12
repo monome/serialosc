@@ -375,11 +375,11 @@ case $PLATFORM in
 		PLATFORM_VERSION=`uname -r`;
 		;;
 
-	#Darwin)
-	#	LIBSUFFIX=dylib;
-	#	PLATFORM_VERSION=`expr "$(sw_vers 2>&1)" : "[^0-9]*\([0-9.]*\)"`;
-	#	export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
-	#	;;
+	Darwin)
+		LIBSUFFIX=dylib;
+		PLATFORM_VERSION=`expr "$(sw_vers 2>&1)" : "[^0-9]*\([0-9.]*\)"`;
+		export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
+		;;
 
 	*)
 		style_error $PLATFORM;
@@ -437,15 +437,6 @@ if [ $PLATFORM = "linux" ]; then
 		style_error "no, your system is outdated"
 		cleanup;
 		exit 1;
-	fi
-fi
-
-if [ $PLATFORM = "darwin" ]; then
-	echo_n "    checking for macports:        ";
-	if check_macports; then
-		style_success "macports $MACPORTS_VERSION";
-	else
-		style_warning "no, you'll be building everything from source"
 	fi
 fi
 
