@@ -141,7 +141,7 @@ static int sys_port_handler(const char *path, const char *types,
 	lo_send_from(old, state->server, LO_TT_IMMEDIATE,
 	             "/sys/port", "i", argv[0]->i);
 	lo_send_from(new, state->server, LO_TT_IMMEDIATE,
-				 "/sys/port", "i", argv[0]->i);
+	             "/sys/port", "i", argv[0]->i);
 
 	state->outgoing = new;
 	lo_address_free(old);
