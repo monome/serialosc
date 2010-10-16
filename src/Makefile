@@ -6,7 +6,7 @@ SERIALOSC_OBJS += osc.o
 SERIALOSC_OBJS += osc_methods.o
 SERIALOSC_OBJS += osc_sys_methods.o
 
-SERIALOSC_OBJS += monitor/$(PLATFORM).o
+SERIALOSC_OBJS += detector/$(PLATFORM).o
 SERIALOSC_OBJS += event_loop/$(EVLOOP).o
 
 all: serialosc
