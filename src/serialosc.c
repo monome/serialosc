@@ -83,18 +83,18 @@ void router_process(monome_t *monome) {
 	}
 
 	DNSServiceRegister(
-		/* sdref          */ &state.ref,
-		/* interfaceIndex */ 0,
-		/* flags          */ 0,
-		/* name           */ monome_get_serial(state.monome),
-		/* regtype        */ "_monome-osc._udp",
-		/* domain         */ NULL,
-		/* host           */ NULL,
-		/* port           */ htons(lo_server_get_port(state.server)),
-		/* txtLen         */ 0,
-		/* txtRecord      */ NULL,
-		/* callBack       */ mdns_callback,
-		/* context        */ NULL);
+		/* sdref          */  &state.ref,
+		/* interfaceIndex */  0,
+		/* flags          */  0,
+		/* name           */  monome_get_serial(state.monome),
+		/* regtype        */  "_monome-osc._udp",
+		/* domain         */  NULL,
+		/* host           */  NULL,
+		/* port           */  htons(lo_server_get_port(state.server)),
+		/* txtLen         */  0,
+		/* txtRecord      */  NULL,
+		/* callBack       */  mdns_callback,
+		/* context        */  NULL);
 
 	monome_register_handler(state.monome, MONOME_BUTTON_DOWN,
 	                        handle_press, &state);

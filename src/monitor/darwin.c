@@ -22,6 +22,14 @@
 #include <signal.h>
 #include <glob.h>
 
+#include <CoreFoundation/CoreFoundation.h>
+
+#include <IOKit/IOKitLib.h>
+#include <IOKit/IOMessage.h>
+#include <IOKit/IOBSD.h>
+#include <IOKit/usb/IOUSBLib.h>
+#include <IOKit/serial/IOSerialKeys.h>
+
 #include <monome.h>
 
 
@@ -38,34 +46,62 @@ static void disable_subproc_waiting() {
 	}
 }
 
-monome_t *scan_connected_devices() {
-	monome_t *device = NULL;
-	glob_t gb;
-	int i;
+static monome_t *iterate_devices(void *context, io_iterator_t iter) {
+	io_service_t device;
+	CFTypeRef dev_path;
+	char dev_node[256];
 
-	gb.gl_offs = 0;
-	if( glob("/dev/tty.usbserial*", GLOB_NOSORT, NULL, &gb) )
-		return NULL;
-	
-	for( i = 0; i < gb.gl_pathc; i++ ) {
-		if( fork() )
+	while( (device = IOIteratorNext(iter)) ) {
+		if( !(dev_path = IORegistryEntryCreateCFProperty(device, CFSTR(kIODialinDeviceKey), kCFAllocatorDefault, 0)) )
 			continue;
 
-		device = monome_open(gb.gl_pathv[i]);
-		break;
+		CFStringGetCString(dev_path, dev_node, sizeof(dev_node), kCFStringEncodingASCII);
+		CFRelease(dev_path);
+
+		if( !fork() )
+			return monome_open(dev_node);
 	}
-	
-	globfree(&gb);
-	return device;
+
+	return NULL;
+}
+
+static int init_iokitlib(IONotificationPortRef notify, io_iterator_t *iter) {
+	kern_return_t k;
+	CFMutableDictionaryRef matching;
+
+	/* initialize IOKit, tell it we want serial devices */
+	if( !(matching = IOServiceMatching(kIOSerialBSDServiceValue)) ) {
+		fprintf(stderr, "IOServiceMatching returned NULL.\n");
+		return 1;
+	}
+
+	CFDictionarySetValue(
+		matching,
+		CFSTR(kIOSerialBSDTypeKey),
+		CFSTR(kIOSerialBSDRS232Type));
+
+	notify = IONotificationPortCreate((mach_port_t) NULL);
+	k = IOServiceAddMatchingNotification(
+		/* notify port       */  notify,
+		/* notification type */  kIOFirstMatchNotification,
+		/* matching dict     */  matching,
+		/* callback          */  NULL,
+		/* callback context  */  NULL,
+		/* iterator          */  iter);
+
+	return 0;
 }
 
 monome_t *next_device() {
+	io_iterator_t iter;
+	IONotificationPortRef notify;
 	monome_t *device = NULL;
 	int stat_loc;
 
 	disable_subproc_waiting();
+	init_iokitlib(notify, &iter);
 
-	if( (device = scan_connected_devices()) )
+	if( (device = iterate_devices(NULL, iter)) )
 		return device;
 
 	wait(&stat_loc);

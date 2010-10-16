@@ -382,6 +382,7 @@ case $PLATFORM in
 
 	Darwin)
 		LIBSUFFIX=dylib;
+		LDFLAGS="$LDFLAGS -framework IOKit -framework CoreFoundation"
 		PLATFORM_VERSION=`expr "$(sw_vers 2>&1)" : "[^0-9]*\([0-9.]*\)"`;
 		export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
 		;;
