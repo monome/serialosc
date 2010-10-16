@@ -14,23 +14,26 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <glob.h>
 
-#include <CoreFoundation/CoreFoundation.h>
+#include <mach/mach.h>
+#include <mach/mach_interface.h>
 
 #include <IOKit/IOKitLib.h>
-#include <IOKit/IOMessage.h>
-#include <IOKit/IOBSD.h>
-#include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/serial/IOSerialKeys.h>
 
 #include <monome.h>
+
+typedef struct {
+	mach_msg_header_t hdr;
+	OSNotificationHeader notify_hdr;
+	IOServiceInterestContent payload;
+	mach_msg_trailer_t trailer;
+} notify_msg_t;
 
 
 static void disable_subproc_waiting() {
@@ -46,64 +49,88 @@ static void disable_subproc_waiting() {
 	}
 }
 
+static int init_iokitlib(mach_port_t *port, io_iterator_t *iter) {
+	CFMutableDictionaryRef matching;
+
+	if( mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, port) ) {
+		fprintf(stderr, "couldn't allocate mach_port_t!\n");
+		return 1;
+	}
+
+	matching = IOServiceMatching(kIOSerialBSDServiceValue);
+	CFDictionarySetValue(matching,
+		CFSTR(kIOSerialBSDTypeKey),
+		CFSTR(kIOSerialBSDRS232Type));
+
+	IOServiceAddNotification(
+		/* master port       */  (mach_port_t) NULL,
+		/* notification type */  kIOMatchedNotification,
+		/* matching dict     */  matching,
+		/* wake port         */  *port,
+		/* reference (???)   */  42424242,
+		/* iterator          */  iter);
+
+	return 0;
+}
+
 static monome_t *iterate_devices(void *context, io_iterator_t iter) {
+	monome_t *monome;
+
 	io_service_t device;
-	CFTypeRef dev_path;
-	char dev_node[256];
+	io_struct_inband_t dev_node;
+	unsigned int len = 256;
 
 	while( (device = IOIteratorNext(iter)) ) {
-		if( !(dev_path = IORegistryEntryCreateCFProperty(device, CFSTR(kIODialinDeviceKey), kCFAllocatorDefault, 0)) )
-			continue;
+		IORegistryEntryGetProperty(device, kIODialinDeviceKey, dev_node, &len);
 
-		CFStringGetCString(dev_path, dev_node, sizeof(dev_node), kCFStringEncodingASCII);
-		CFRelease(dev_path);
+		if( !fork() ) {
+			monome = monome_open(dev_node);
+			IOObjectRelease(device);
 
-		if( !fork() )
-			return monome_open(dev_node);
+			return monome;
+		}
+
+		IOObjectRelease(device);
 	}
 
 	return NULL;
 }
 
-static int init_iokitlib(IONotificationPortRef notify, io_iterator_t *iter) {
-	kern_return_t k;
-	CFMutableDictionaryRef matching;
+static int wait_for_connection(mach_port_t *wait_port) {
+	notify_msg_t msg;
 
-	/* initialize IOKit, tell it we want serial devices */
-	if( !(matching = IOServiceMatching(kIOSerialBSDServiceValue)) ) {
-		fprintf(stderr, "IOServiceMatching returned NULL.\n");
+	if( mach_msg(
+			&msg.hdr, MACH_RCV_MSG, 0, sizeof(msg), 
+			*wait_port, 0, MACH_PORT_NULL) ) {
+		fprintf(stderr, "mach_msg() failed, aieee!\n");
 		return 1;
 	}
-
-	CFDictionarySetValue(
-		matching,
-		CFSTR(kIOSerialBSDTypeKey),
-		CFSTR(kIOSerialBSDRS232Type));
-
-	notify = IONotificationPortCreate((mach_port_t) NULL);
-	k = IOServiceAddMatchingNotification(
-		/* notify port       */  notify,
-		/* notification type */  kIOFirstMatchNotification,
-		/* matching dict     */  matching,
-		/* callback          */  NULL,
-		/* callback context  */  NULL,
-		/* iterator          */  iter);
 
 	return 0;
 }
 
 monome_t *next_device() {
 	io_iterator_t iter;
-	IONotificationPortRef notify;
-	monome_t *device = NULL;
-	int stat_loc;
+	mach_port_t wait_port;
+	monome_t *monome = NULL;
 
 	disable_subproc_waiting();
-	init_iokitlib(notify, &iter);
+	if( init_iokitlib(&wait_port, &iter) )
+		return NULL;
 
-	if( (device = iterate_devices(NULL, iter)) )
-		return device;
+	for(;; monome = NULL) {
+		/* main detection loop:
+		     monome = iterate_devices(NULL, iter) only returns in a subprocess,
+			 and wait_for_connection(&wait_port) chills until a monome gets
+			 plugged in. */
 
-	wait(&stat_loc);
-	return NULL;
+		if( (monome = iterate_devices(NULL, iter))
+			|| wait_for_connection(&wait_port) )
+			break;
+	}
+
+	IOObjectRelease(iter);
+	mach_port_deallocate(mach_task_self(), wait_port);
+
+	return monome;
 }
