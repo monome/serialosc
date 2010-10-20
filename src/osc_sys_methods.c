@@ -189,10 +189,8 @@ static int sys_prefix_handler(const char *path, const char *types,
 	state->osc_prefix = new;
 	osc_register_methods(state);
 
-	/*
-	 * question: how do we notify applications of the new prefix?
-	 * there's no {prefix}/prefix command, only /sys/prefix
-	 */
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE,
+	             "/sys/prefix", "s", new);
 
 	free(old);
 
