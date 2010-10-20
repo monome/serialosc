@@ -49,11 +49,11 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static int init_iokitlib(mach_port_t *port, io_iterator_t *iter) {
+static int init_iokitlib(IONotificationPortRef *notify, io_iterator_t *iter) {
 	CFMutableDictionaryRef matching;
 
-	if( mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, port) ) {
-		fprintf(stderr, "couldn't allocate mach_port_t!\n");
+	if( !(*notify = IONotificationPortCreate((mach_port_t) NULL)) ) {
+		fprintf(stderr, "couldn't allocate notification port, aieee!\n");
 		return 1;
 	}
 
@@ -62,15 +62,20 @@ static int init_iokitlib(mach_port_t *port, io_iterator_t *iter) {
 		CFSTR(kIOSerialBSDTypeKey),
 		CFSTR(kIOSerialBSDRS232Type));
 
-	IOServiceAddNotification(
-		/* master port       */  (mach_port_t) NULL,
+	IOServiceAddMatchingNotification(
+		/* notify port       */  *notify,
 		/* notification type */  kIOMatchedNotification,
 		/* matching dict     */  matching,
-		/* wake port         */  *port,
-		/* reference (???)   */  42424242,
+		/* callback          */  NULL,
+		/* callback context  */  NULL,
 		/* iterator          */  iter);
 
 	return 0;
+}
+
+static void fini_iokitlib(IONotificationPortRef *notify, io_iterator_t *iter) {
+	IOObjectRelease(*iter);
+	IONotificationPortDestroy(*notify);
 }
 
 static monome_t *iterate_devices(void *context, io_iterator_t iter) {
@@ -99,9 +104,8 @@ static monome_t *iterate_devices(void *context, io_iterator_t iter) {
 static int wait_for_connection(mach_port_t *wait_port) {
 	notify_msg_t msg;
 
-	if( mach_msg(
-			&msg.hdr, MACH_RCV_MSG, 0, sizeof(msg), 
-			*wait_port, 0, MACH_PORT_NULL) ) {
+	if( mach_msg(&msg.hdr, MACH_RCV_MSG, 0, sizeof(msg), 
+	             *wait_port, 0, MACH_PORT_NULL) ) {
 		fprintf(stderr, "mach_msg() failed, aieee!\n");
 		return 1;
 	}
@@ -110,13 +114,17 @@ static int wait_for_connection(mach_port_t *wait_port) {
 }
 
 monome_t *next_device() {
-	io_iterator_t iter;
+	IONotificationPortRef notify;
 	mach_port_t wait_port;
+	io_iterator_t iter;
+
 	monome_t *monome = NULL;
 
 	disable_subproc_waiting();
-	if( init_iokitlib(&wait_port, &iter) )
+	if( init_iokitlib(&notify, &iter) )
 		return NULL;
+
+	wait_port = IONotificationPortGetMachPort(notify);
 
 	for(;; monome = NULL) {
 		/* main detection loop:
@@ -129,8 +137,6 @@ monome_t *next_device() {
 			break;
 	}
 
-	IOObjectRelease(iter);
-	mach_port_deallocate(mach_task_self(), wait_port);
-
+	fini_iokitlib(&notify, &iter);
 	return monome;
 }
