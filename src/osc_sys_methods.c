@@ -88,13 +88,13 @@ static int sys_rotation_handler(const char *path, const char *types,
 }
 
 static void send_info(lo_address *to, sosc_state_t *state) {
-	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/info", "siissi",
+	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/info", "siisis",
 	             monome_get_serial(state->monome),
 	             monome_get_rows(state->monome),
 	             monome_get_cols(state->monome),
-	             state->osc_prefix,
 	             lo_address_get_hostname(state->outgoing),
-	             atoi(lo_address_get_port(state->outgoing)));
+	             atoi(lo_address_get_port(state->outgoing)),
+	             state->osc_prefix);
 }
 
 static int sys_info_handler(const char *path, const char *types,
