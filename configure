@@ -237,8 +237,6 @@ EOF
 	if [ $PKGCONFIG_VERSION ]; then
 		CMD="pkg-config --modversion libudev"
 		LIBUDEV_VERSION=`$CMD 2> /dev/null`;
-		
-		[ $? -ne 0 ] && return 0;
 	fi
 
 	return 0;
