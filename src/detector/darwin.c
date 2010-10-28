@@ -20,20 +20,18 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include <mach/mach.h>
-#include <mach/mach_interface.h>
+#include <CoreFoundation/CoreFoundation.h>
 
 #include <IOKit/IOKitLib.h>
 #include <IOKit/serial/IOSerialKeys.h>
 
 #include <monome.h>
 
+
 typedef struct {
-	mach_msg_header_t hdr;
-	OSNotificationHeader notify_hdr;
-	IOServiceInterestContent payload;
-	mach_msg_trailer_t trailer;
-} notify_msg_t;
+	IONotificationPortRef notify;
+	io_iterator_t iter;
+} notify_state_t;
 
 
 static void disable_subproc_waiting() {
@@ -49,13 +47,22 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static int init_iokitlib(IONotificationPortRef *notify, io_iterator_t *iter) {
+static void device_added(void *context, io_iterator_t iter) {
+	/* what is it with apple and requiring callbacks all over the place? */
+}
+
+static int init_iokitlib(notify_state_t *state) {
 	CFMutableDictionaryRef matching;
 
-	if( !(*notify = IONotificationPortCreate((mach_port_t) NULL)) ) {
+	if( !(state->notify = IONotificationPortCreate((mach_port_t) NULL)) ) {
 		fprintf(stderr, "couldn't allocate notification port, aieee!\n");
 		return 1;
 	}
+
+	CFRunLoopAddSource(
+		/* run loop */  CFRunLoopGetCurrent(),
+		/* source   */  IONotificationPortGetRunLoopSource(state->notify),
+		/* mode     */  kCFRunLoopDefaultMode);
 
 	matching = IOServiceMatching(kIOSerialBSDServiceValue);
 	CFDictionarySetValue(matching,
@@ -63,19 +70,19 @@ static int init_iokitlib(IONotificationPortRef *notify, io_iterator_t *iter) {
 		CFSTR(kIOSerialBSDRS232Type));
 
 	IOServiceAddMatchingNotification(
-		/* notify port       */  *notify,
+		/* notify port       */  state->notify,
 		/* notification type */  kIOMatchedNotification,
 		/* matching dict     */  matching,
-		/* callback          */  NULL,
+		/* callback          */  device_added,
 		/* callback context  */  NULL,
-		/* iterator          */  iter);
+		/* iterator          */  &state->iter);
 
 	return 0;
 }
 
-static void fini_iokitlib(IONotificationPortRef *notify, io_iterator_t *iter) {
-	IOObjectRelease(*iter);
-	IONotificationPortDestroy(*notify);
+static void fini_iokitlib(notify_state_t *state) {
+	IOObjectRelease(state->iter);
+	IONotificationPortDestroy(state->notify);
 }
 
 static monome_t *iterate_devices(void *context, io_iterator_t iter) {
@@ -101,42 +108,33 @@ static monome_t *iterate_devices(void *context, io_iterator_t iter) {
 	return NULL;
 }
 
-static int wait_for_connection(mach_port_t *wait_port) {
-	notify_msg_t msg;
-
-	if( mach_msg(&msg.hdr, MACH_RCV_MSG, 0, sizeof(msg), 
-	             *wait_port, 0, MACH_PORT_NULL) ) {
-		fprintf(stderr, "mach_msg() failed, aieee!\n");
-		return 1;
-	}
+static int wait_for_connection() {
+	CFRunLoopRunInMode(
+		/*                        mode  */  kCFRunLoopDefaultMode,
+		/*                     timeout  */  1.0e10,
+		/* return after source handled  */  true);
 
 	return 0;
 }
 
 monome_t *next_device() {
-	IONotificationPortRef notify;
-	mach_port_t wait_port;
-	io_iterator_t iter;
-
+	notify_state_t state;
 	monome_t *monome = NULL;
 
 	disable_subproc_waiting();
-	if( init_iokitlib(&notify, &iter) )
+	if( init_iokitlib(&state) )
 		return NULL;
-
-	wait_port = IONotificationPortGetMachPort(notify);
 
 	for(;; monome = NULL) {
 		/* main detection loop:
 		     monome = iterate_devices(NULL, iter) only returns in a subprocess,
-			 and wait_for_connection(&wait_port) chills until a monome gets
-			 plugged in. */
+		     and wait_for_connection() chills until you plug in a monome. */
 
-		if( (monome = iterate_devices(NULL, iter))
-			|| wait_for_connection(&wait_port) )
+		if( (monome = iterate_devices(NULL, state.iter))
+			|| wait_for_connection() )
 			break;
 	}
 
-	fini_iokitlib(&notify, &iter);
+	fini_iokitlib(&state);
 	return monome;
 }
