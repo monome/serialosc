@@ -123,13 +123,13 @@ style_warning () { att yellow bold; echo $*; att; }
 style_link    () { att blue bold underline; _echo $*; att; }
 
 cleanup () {
-	rmdir .conftests
+	rm -rf .conftests
 }
 
 # feature test commands
 
 try_command () {
-	if $* > /dev/null 2> /dev/null; then
+	if $* > /dev/null 2>> .config.log; then
 		return 0;
 	else
 		return 1;
@@ -239,6 +239,23 @@ EOF
 		LIBUDEV_VERSION=`$CMD 2> /dev/null`;
 	fi
 
+	return 0;
+}
+
+check_dnssd() {
+	cat <<EOF > .conftests/dnssd.c
+#include <dns_sd.h>
+
+int main(int argc, char **argv) {
+	DNSServiceRef ref;
+	return 0;
+}
+EOF
+
+	compile_and_run dnssd "" "-ldns_sd";
+	RET=$?;
+
+	[ $RET -ne 0 ] && return $RET;
 	return 0;
 }
 
@@ -362,6 +379,7 @@ LIBMONOME_LDFLAGS="-L$LIBMONOME_PREFIX/lib $LIBMONOME_LDFLAGS"
 
 echo "";
 mkdir -p .conftests
+rm -f .config.log
 check_pkgconfig;
 
 att bold;
@@ -375,7 +393,7 @@ case $PLATFORM in
 	Linux)
 		LIBSUFFIX=so;
 		PLATFORM_VERSION=`uname -r`;
-		LDFLAGS="-Wl,-rpath,\$(LIBDIR) $LDFLAGS -ldns_sd"
+		LDFLAGS="-Wl,-rpath,\$(LIBDIR) $LDFLAGS"
 		;;
 
 	Darwin)
@@ -428,24 +446,41 @@ conf_poll() {
 }
 
 conf_poll;
+echo ""
 
 if [ $PLATFORM = "linux" ]; then
-	echo_n "    checking for libudev:         ";
-	if check_libudev; then
-		style_success "libudev $LIBUDEV_VERSION";
-		PLATFORM=linux_libudev;
-		LDFLAGS="$LDFLAGS -ludev";
-	else
-		# why the fuck would you run a system this old
+	conf_libudev() {
+		echo_n "    checking for libudev:         ";
+		if check_libudev; then
+			style_success "libudev $LIBUDEV_VERSION";
+			PLATFORM=linux_libudev;
+			LDFLAGS="$LDFLAGS -ludev";
+		else
+			# why the fuck would you run a system this old
 
-		style_error "no, your system is outdated"
-		cleanup;
-		exit 1;
-	fi
+			style_error "no, your system is outdated"
+			cleanup;
+			exit 1;
+		fi
+	}
+
+	conf_dnssd() {
+		echo_n "    checking for libdns_sd:       ";
+		if check_dnssd; then
+			style_success "indeed";
+			LDFLAGS="$LDFLAGS -ldns_sd";
+		else
+			style_error "no mdns";
+			cleanup;
+			exit 1;
+		fi
+	}
+
+	conf_libudev;
+	conf_dnssd;
 fi
 
 conf_liblo() {
-	echo ""
 	echo_n "    checking for liblo:           ";
 	if check_lo; then
 		style_success "liblo $LO_VERSION";
