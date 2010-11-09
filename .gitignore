@@ -6,3 +6,4 @@
 
 # ./configure output
 config.mk
+.config.log
