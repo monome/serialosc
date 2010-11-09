@@ -26,7 +26,7 @@
 #include <monome.h>
 
 #include "serialosc.h"
-#include "monitor.h"
+#include "detector.h"
 
 
 static void disable_subproc_waiting() {

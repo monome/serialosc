@@ -25,7 +25,7 @@
 #include <monome.h>
 
 #include "serialosc.h"
-#include "monitor.h"
+#include "detector.h"
 #include "osc.h"
 
 
