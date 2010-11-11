@@ -32,6 +32,8 @@
 typedef struct {
 	IONotificationPortRef notify;
 	io_iterator_t iter;
+
+	const char *exec_path;
 } notify_state_t;
 
 
@@ -48,14 +50,43 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static void device_added(void *context, io_iterator_t iter) {
-	/* what is it with apple and requiring callbacks all over the place? */
+static int spawn_router(const char *exec_path, const char *devnode) {
+	switch( fork() ) {
+	case 0:  break;
+	case -1: perror("spawn_router fork"); return 1;
+	default: return 0;
+	}
+
+	execlp(exec_path, exec_path, devnode, NULL);
+
+	/* only get here if an error occurs */
+	perror("spawn_router execlp");
+	return 1;
+}
+
+static void iterate_devices(void *context, io_iterator_t iter) {
+	notify_state_t *state = context;
+
+	io_service_t device;
+	io_struct_inband_t devnode;
+	unsigned int len = 256;
+
+	while( (device = IOIteratorNext(iter)) ) {
+		IORegistryEntryGetProperty(device, kIODialinDeviceKey, devnode, &len);
+
+		if( spawn_router(state->exec_path, devnode) )
+			return;
+
+		IOObjectRelease(device);
+	}
+
+	return;
 }
 
 static int init_iokitlib(notify_state_t *state) {
 	CFMutableDictionaryRef matching;
 
-	if( !(state->notify = IONotificationPortCreate((mach_port_t) NULL)) ) {
+	if( !(state->notify = IONotificationPortCreate((mach_port_t) 0)) ) {
 		fprintf(stderr, "couldn't allocate notification port, aieee!\n");
 		return 1;
 	}
@@ -74,8 +105,8 @@ static int init_iokitlib(notify_state_t *state) {
 		/* notify port       */  state->notify,
 		/* notification type */  kIOMatchedNotification,
 		/* matching dict     */  matching,
-		/* callback          */  device_added,
-		/* callback context  */  NULL,
+		/* callback          */  iterate_devices,
+		/* callback context  */  state,
 		/* iterator          */  &state->iter);
 
 	return 0;
@@ -86,56 +117,19 @@ static void fini_iokitlib(notify_state_t *state) {
 	IONotificationPortDestroy(state->notify);
 }
 
-static monome_t *iterate_devices(void *context, io_iterator_t iter) {
-	monome_t *monome;
-
-	io_service_t device;
-	io_struct_inband_t dev_node;
-	unsigned int len = 256;
-
-	while( (device = IOIteratorNext(iter)) ) {
-		IORegistryEntryGetProperty(device, kIODialinDeviceKey, dev_node, &len);
-
-		if( !fork() ) {
-			monome = monome_open(dev_node);
-			IOObjectRelease(device);
-
-			return monome;
-		}
-
-		IOObjectRelease(device);
-	}
-
-	return NULL;
-}
-
-static int wait_for_connection() {
-	CFRunLoopRunInMode(
-		/*                        mode  */  kCFRunLoopDefaultMode,
-		/*                     timeout  */  1.0e10,
-		/* return after source handled  */  true);
-
-	return 0;
-}
-
-monome_t *next_device() {
+int detector_process(const char *exec_path) {
 	notify_state_t state;
-	monome_t *monome = NULL;
+
+	assert(exec_path);
+	state.exec_path = exec_path;
 
 	disable_subproc_waiting();
 	if( init_iokitlib(&state) )
-		return NULL;
+		return 1;
 
-	for(;; monome = NULL) {
-		/* main detection loop:
-		     monome = iterate_devices(NULL, iter) only returns in a subprocess,
-		     and wait_for_connection() chills until you plug in a monome. */
-
-		if( (monome = iterate_devices(NULL, state.iter))
-			|| wait_for_connection() )
-			break;
-	}
+	iterate_devices(&state, state.iter);
+	CFRunLoopRun();
 
 	fini_iokitlib(&state);
-	return monome;
+	return 0;
 }

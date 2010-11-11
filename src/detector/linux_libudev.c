@@ -52,15 +52,9 @@ static void disable_subproc_waiting() {
 
 static int spawn_router(const char *exec_path, const char *devnode) {
 	switch( fork() ) {
-	case 0:
-		break;
-
-	case -1:
-		perror("spawn_router fork");
-		return 1;
-
-	default:
-		return 0;
+	case 0:  break;
+	case -1: perror("spawn_router fork"); return 1;
+	default: return 0;
 	}
 
 	execlp(exec_path, exec_path, devnode, NULL);
