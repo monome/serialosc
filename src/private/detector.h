@@ -16,7 +16,4 @@
 
 #include <monome.h>
 
-/* returns an initialized monome_t.
-   this function returns in a subprocess. */
-
-monome_t *next_device();
+int detector_process(const char *exec);

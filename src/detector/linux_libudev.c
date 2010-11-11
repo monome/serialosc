@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -29,6 +30,13 @@
 #include "detector.h"
 
 
+typedef struct {
+	struct udev *u;
+	struct udev_monitor *um;
+
+	const char *exec_path;
+} detector_state_t;
+
 static void disable_subproc_waiting() {
 	struct sigaction s;
 
@@ -42,14 +50,31 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static monome_t *monitor_attach(struct udev_monitor *um) {
+static int spawn_router(const char *exec_path, const char *devnode) {
+	switch( fork() ) {
+	case 0:
+		break;
+
+	case -1:
+		perror("spawn_router fork");
+		return 1;
+
+	default:
+		return 0;
+	}
+
+	execlp(exec_path, exec_path, devnode, NULL);
+
+	/* only get here if an error occurs */
+	perror("spawn_router execlp");
+	return 1;
+}
+
+static monome_t *monitor_attach(detector_state_t *state) {
 	struct udev_device *ud;
 	struct pollfd fds[1];
 
-	const char *devnode = NULL;
-	monome_t *device = NULL;
-
-	fds[0].fd = udev_monitor_get_fd(um);
+	fds[0].fd = udev_monitor_get_fd(state->um);
 	fds[0].events = POLLIN;
 
 	do {
@@ -64,37 +89,26 @@ static monome_t *monitor_attach(struct udev_monitor *um) {
 				continue;
 			}
 
-		ud = udev_monitor_receive_device(um);
+		ud = udev_monitor_receive_device(state->um);
 
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
-		if( *(udev_device_get_action(ud)) != 'a' )
-			goto next;
+		if( *(udev_device_get_action(ud)) == 'a' )
+			spawn_router(state->exec_path, udev_device_get_devnode(ud));
 
-		devnode = udev_device_get_devnode(ud);
-
-		if( !fork() ) {
-			device = monome_open(devnode);
-
-			udev_device_unref(ud);
-			return device;
-		}
-
-next:
 		udev_device_unref(ud);
 	} while( 1 );
 }
 
-static monome_t *scan_connected_devices(struct udev *u) {
+int scan_connected_devices(detector_state_t *state) {
 	struct udev_list_entry *cursor;
 	struct udev_enumerate *ue;
 	struct udev_device *ud;
 
 	const char *devnode = NULL;
-	monome_t *device = NULL;
 
-	if( !(ue = udev_enumerate_new(u)) )
-		return NULL;
+	if( !(ue = udev_enumerate_new(state->u)) )
+		return 1;
 
 	udev_enumerate_add_match_subsystem(ue, "tty");
 	udev_enumerate_add_match_property(ue, "ID_BUS", "usb");
@@ -102,36 +116,42 @@ static monome_t *scan_connected_devices(struct udev *u) {
 	cursor = udev_enumerate_get_list_entry(ue);
 
 	do {
-		ud = udev_device_new_from_syspath(u, udev_list_entry_get_name(cursor));
+		ud = udev_device_new_from_syspath(
+			state->u, udev_list_entry_get_name(cursor));
 
-		if( (devnode = udev_device_get_devnode(ud)) && !fork() )
-			device = monome_open(devnode);
+		if( (devnode = udev_device_get_devnode(ud)) )
+			spawn_router(state->exec_path, devnode);
 
 		udev_device_unref(ud);
-	} while( !device && (cursor = udev_list_entry_get_next(cursor)) );
+	} while( (cursor = udev_list_entry_get_next(cursor)) );
 
 	udev_enumerate_unref(ue);
-	return device;
+	return 0;
 }
 
-monome_t *next_device() {
-	struct udev *u = udev_new();
-	struct udev_monitor *um;
-	monome_t *device = NULL;
+int detector_process(const char *exec_path) {
+	detector_state_t state = {
+		.exec_path = exec_path
+	};
 
+	assert(exec_path);
 	disable_subproc_waiting();
+	state.u = udev_new();
 
-	if( !(um = udev_monitor_new_from_netlink(u, "udev")) )
-		return NULL;
+	if( scan_connected_devices(&state) )
+		return 1;
 
-	udev_monitor_filter_add_match_subsystem_devtype(um, "tty", NULL);
-	udev_monitor_enable_receiving(um);
+	if( !(state.um = udev_monitor_new_from_netlink(state.u, "udev")) )
+		return 2;
 
-	if( !(device = scan_connected_devices(u)) )
-		device = monitor_attach(um);
+	udev_monitor_filter_add_match_subsystem_devtype(state.um, "tty", NULL);
+	udev_monitor_enable_receiving(state.um);
 
-	udev_monitor_unref(um);
-	udev_unref(u);
+	if( monitor_attach(&state) )
+		return 3;
 
-	return device;
+	udev_monitor_unref(state.um);
+	udev_unref(state.u);
+
+	return 0;
 }

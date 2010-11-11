@@ -128,9 +128,19 @@ err_lo_addr:
 int main(int argc, char **argv) {
 	monome_t *device;
 
-	/* next_device() either returns on failure or in a subprocess */
-	if( !(device = next_device()) )
-		exit(EXIT_FAILURE);
+	if( argc < 2 ) {
+		/* run as the detector process */
+		if( detector_process(argv[0]) )
+			return EXIT_FAILURE;
+
+		return EXIT_SUCCESS;
+	}
+
+	/* run as a device OSC router */
+	if( !(device = monome_open(argv[1])) ) {
+		fprintf(stderr, "serialosc: could not open device \"%s\"\n", argv[1]);
+		return EXIT_FAILURE;
+	}
 
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
 	router_process(device);
