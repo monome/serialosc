@@ -73,10 +73,7 @@ static void iterate_devices(void *context, io_iterator_t iter) {
 
 	while( (device = IOIteratorNext(iter)) ) {
 		IORegistryEntryGetProperty(device, kIODialinDeviceKey, devnode, &len);
-
-		if( spawn_router(state->exec_path, devnode) )
-			return;
-
+		spawn_router(state->exec_path, devnode);
 		IOObjectRelease(device);
 	}
 
