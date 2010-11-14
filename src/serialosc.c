@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <arpa/inet.h>
 
 #include <lo/lo.h>
@@ -35,6 +36,15 @@
 #define DEFAULT_OSC_APP_HOST    "127.0.0.1"
 #define DEFAULT_ROTATION        MONOME_ROTATE_0
 
+
+static void chill(time_t msec) {
+	struct timespec rq;
+
+	rq.tv_sec = msec / 1000;
+	rq.tv_nsec = (msec - (rq.tv_sec * 1000)) * 1000000;
+
+	nanosleep(&rq, NULL);
+}
 
 static void lo_error(int num, const char *error_msg, const char *path) {
 	fprintf(stderr, "serialosc: lo server error %d in %s: %s\n",
@@ -137,6 +147,8 @@ int main(int argc, char **argv) {
 	}
 
 	/* run as a device OSC router */
+	chill(5); /* XXX: OSX hack */
+
 	if( !(device = monome_open(argv[1])) )
 		return EXIT_FAILURE;
 
