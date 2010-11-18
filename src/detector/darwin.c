@@ -22,6 +22,7 @@
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
+#include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/serial/IOSerialKeys.h>
 
 #include <monome.h>
@@ -64,6 +65,26 @@ static int spawn_router(const char *exec_path, const char *devnode) {
 	return 1;
 }
 
+static int wait_on_parent_usbdevice(io_service_t device) {
+	io_registry_entry_t parent;
+
+	/* walk up the device tree looking for the IOUSBDevice */
+	for( ;; ) {
+		/* return an error if we've walked off the end of the tree,
+		   i.e. if this tty isn't a USB device. */
+		if( IORegistryEntryGetParentEntry(device, kIOServicePlane, &parent) )
+			return 1;
+		device = parent;
+
+		if( IOObjectConformsTo(device, kIOUSBDeviceClassName) )
+			break;
+	}
+
+	/* wait until the device is ready to be opened */
+	IOServiceWaitQuiet(device, NULL);
+	return 0;
+}
+
 static void iterate_devices(void *context, io_iterator_t iter) {
 	notify_state_t *state = context;
 
@@ -73,7 +94,10 @@ static void iterate_devices(void *context, io_iterator_t iter) {
 
 	while( (device = IOIteratorNext(iter)) ) {
 		IORegistryEntryGetProperty(device, kIODialinDeviceKey, devnode, &len);
-		spawn_router(state->exec_path, devnode);
+
+		if( !wait_on_parent_usbdevice(device) )
+			spawn_router(state->exec_path, devnode);
+
 		IOObjectRelease(device);
 	}
 
