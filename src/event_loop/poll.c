@@ -27,7 +27,7 @@ int event_loop(const sosc_state_t *state) {
 	fds[0].fd = monome_get_fd(state->monome);
 	fds[1].fd = lo_server_get_socket_fd(state->server);
 
-	fds[0].events = POLLIN | POLLOUT;
+	fds[0].events = POLLIN;
 	fds[1].events = POLLIN;
 
 	do {
@@ -52,7 +52,7 @@ int event_loop(const sosc_state_t *state) {
 			monome_event_handle_next(state->monome);
 
 		/* how about from OSC? */
-		if( fds[1].revents & POLLIN && fds[0].revents & POLLOUT )
+		if( fds[1].revents & POLLIN )
 			lo_server_recv_noblock(state->server, 0);
 	} while( 1 );
 }
