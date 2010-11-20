@@ -11,7 +11,7 @@ SERIALOSC_OBJS += event_loop/$(EVLOOP).o
 
 all: serialosc
 
-install:
+install: all
 	$(INSTALL) -d $(BINDIR)
 
 	echo "  INSTALL src/serialosc -> $(BINDIR)/serialosc"
