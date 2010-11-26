@@ -4,7 +4,7 @@
   \__ \  __/ |  | | (_| | | (_) \__ \ (__|_|
   |___/\___|_|  |_|\__,_|_|\___/|___/\___(_)
 
-   serialosc is an osc router for yr monome
+   serialosc is an osc server for yr monome
 
    it is a daemon that waits for you to
    plug a monome in, then it spawns off a

@@ -51,17 +51,17 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static int spawn_router(const char *exec_path, const char *devnode) {
+static int spawn_server(const char *exec_path, const char *devnode) {
 	switch( fork() ) {
 	case 0:  break;
-	case -1: perror("spawn_router fork"); return 1;
+	case -1: perror("spawn_server fork"); return 1;
 	default: return 0;
 	}
 
 	execlp(exec_path, exec_path, devnode, NULL);
 
 	/* only get here if an error occurs */
-	perror("spawn_router execlp");
+	perror("spawn_server execlp");
 	return 1;
 }
 
@@ -96,7 +96,7 @@ static void iterate_devices(void *context, io_iterator_t iter) {
 		IORegistryEntryGetProperty(device, kIODialinDeviceKey, devnode, &len);
 
 		if( !wait_on_parent_usbdevice(device) )
-			spawn_router(state->exec_path, devnode);
+			spawn_server(state->exec_path, devnode);
 
 		IOObjectRelease(device);
 	}

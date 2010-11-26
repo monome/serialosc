@@ -62,7 +62,7 @@ void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 
 }
 
-void router_process(monome_t *monome) {
+void server_process(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
 	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
@@ -137,12 +137,12 @@ int main(int argc, char **argv) {
 		return EXIT_SUCCESS;
 	}
 
-	/* run as a device OSC router */
+	/* run as a device OSC server */
 	if( !(device = monome_open(argv[1])) )
 		return EXIT_FAILURE;
 
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
-	router_process(device);
+	server_process(device);
 	monome_close(device);
 
 	return EXIT_SUCCESS;

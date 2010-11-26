@@ -50,17 +50,17 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static int spawn_router(const char *exec_path, const char *devnode) {
+static int spawn_server(const char *exec_path, const char *devnode) {
 	switch( fork() ) {
 	case 0:  break;
-	case -1: perror("spawn_router fork"); return 1;
+	case -1: perror("spawn_server fork"); return 1;
 	default: return 0;
 	}
 
 	execlp(exec_path, exec_path, devnode, NULL);
 
 	/* only get here if an error occurs */
-	perror("spawn_router execlp");
+	perror("spawn_server execlp");
 	return 1;
 }
 
@@ -88,7 +88,7 @@ static monome_t *monitor_attach(detector_state_t *state) {
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
 		if( *(udev_device_get_action(ud)) == 'a' )
-			spawn_router(state->exec_path, udev_device_get_devnode(ud));
+			spawn_server(state->exec_path, udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
 	} while( 1 );
@@ -114,7 +114,7 @@ int scan_connected_devices(detector_state_t *state) {
 			state->u, udev_list_entry_get_name(cursor));
 
 		if( (devnode = udev_device_get_devnode(ud)) )
-			spawn_router(state->exec_path, devnode);
+			spawn_server(state->exec_path, devnode);
 
 		udev_device_unref(ud);
 	} while( (cursor = udev_list_entry_get_next(cursor)) );
