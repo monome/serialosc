@@ -2,7 +2,7 @@ SHELL = /bin/sh
 
 include config.mk
 
-export CFLAGS  += -ggdb -Wall -Werror -DVERSION=\"$(VERSION)\" -DLIBSUFFIX=\".$(LIBSUFFIX)\" -DLIBDIR=\"$(LIBDIR)\" -std=c99 -pedantic
+export CFLAGS  += -ggdb -Wall -Werror -DVERSION=\"$(VERSION)\" -std=c99 -pedantic
 export LDFLAGS += -L$(LIBDIR)
 export INSTALL = install
 
