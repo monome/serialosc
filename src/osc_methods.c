@@ -81,7 +81,7 @@ static int osc_frame_handler(const char *path, const char *types,
                              lo_message data, void *user_data) {
 	monome_t *monome = user_data;
 	uint8_t buf[8];
-	uint i;
+	int i;
 
 	for( i = 0; i < 8; i++ )
 		buf[i] = argv[i]->i;
