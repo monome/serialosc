@@ -16,4 +16,4 @@
 
 #include <monome.h>
 
-int detector_process(const char *exec);
+int detector_run(const char *exec);

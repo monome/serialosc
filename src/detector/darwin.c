@@ -138,7 +138,7 @@ static void fini_iokitlib(notify_state_t *state) {
 	IONotificationPortDestroy(state->notify);
 }
 
-int detector_process(const char *exec_path) {
+int detector_run(const char *exec_path) {
 	notify_state_t state;
 
 	assert(exec_path);

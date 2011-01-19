@@ -60,9 +60,11 @@ void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 	/* on OSX, the bonjour library insists on having a callback passed to
 	   DNSServiceRegister. */
 
+	return;
+
 }
 
-void server_process(monome_t *monome) {
+void server_run(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
 	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
@@ -131,7 +133,7 @@ int main(int argc, char **argv) {
 
 	if( argc < 2 ) {
 		/* run as the detector process */
-		if( detector_process(argv[0]) )
+		if( detector_run(argv[0]) )
 			return EXIT_FAILURE;
 
 		return EXIT_SUCCESS;
@@ -142,7 +144,7 @@ int main(int argc, char **argv) {
 		return EXIT_FAILURE;
 
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
-	server_process(device);
+	server_run(device);
 	monome_close(device);
 
 	return EXIT_SUCCESS;
