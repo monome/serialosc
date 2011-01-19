@@ -47,7 +47,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 	sosc_state_t *state = data;
 	char *cmd;
 
-	cmd = osc_path("press", state->osc_prefix);
+	cmd = osc_path("press", state->config.app.osc_prefix);
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
 	             e->x, e->y, e->event_type);
 	free(cmd);
@@ -78,7 +78,7 @@ void server_run(monome_t *monome) {
 		goto err_lo_addr;
 	}
 
-	if( !(state.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) ) {
+	if( !(state.config.app.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) ) {
 		fprintf(
 			stderr, "serialosc [%s]: can't strdup(), aieee!\n",
 			monome_get_serial(state.monome));
@@ -121,7 +121,7 @@ void server_run(monome_t *monome) {
 
 	DNSServiceRefDeallocate(state.ref);
 
-	free(state.osc_prefix);
+	free(state.config.app.osc_prefix);
 err_nomem:
 	lo_address_free(state.outgoing);
 err_lo_addr:

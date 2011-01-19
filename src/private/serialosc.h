@@ -18,8 +18,24 @@
 #include <lo/lo.h>
 #include <monome.h>
 
-#ifndef __SERIALOSC_H_
-#define __SERIALOSC_H_
+#ifndef SERIALOSC_H
+#define SERIALOSC_H
+
+typedef struct {
+	struct {
+		char port[6];
+	} server;
+
+	struct {
+		char *osc_prefix;
+		char *host;
+		char port[6];
+	} app;
+
+	struct {
+		monome_rotate_t rotation;
+	} dev;
+} sosc_config_t;
 
 typedef struct {
 	monome_t *monome;
@@ -28,7 +44,7 @@ typedef struct {
 
 	DNSServiceRef ref;
 
-	char *osc_prefix;
+	sosc_config_t config;
 } sosc_state_t;
 
 int event_loop(const sosc_state_t *state);

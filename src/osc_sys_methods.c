@@ -94,7 +94,7 @@ static void send_info(lo_address *to, sosc_state_t *state) {
 	             monome_get_cols(state->monome),
 	             lo_address_get_hostname(state->outgoing),
 	             atoi(lo_address_get_port(state->outgoing)),
-	             state->osc_prefix);
+	             state->config.app.osc_prefix);
 }
 
 static int sys_info_handler(const char *path, const char *types,
@@ -177,7 +177,7 @@ static int sys_prefix_handler(const char *path, const char *types,
                               lo_arg **argv, int argc,
                               lo_message data, void *user_data) {
 	sosc_state_t *state = user_data;
-	char *new, *old = state->osc_prefix;
+	char *new, *old = state->config.app.osc_prefix;
 
 	new = &argv[0]->s;
 
@@ -188,7 +188,7 @@ static int sys_prefix_handler(const char *path, const char *types,
 		new = strdup(&argv[0]->s);
 
 	osc_unregister_methods(state);
-	state->osc_prefix = new;
+	state->config.app.osc_prefix = new;
 	osc_register_methods(state);
 
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE,

@@ -112,7 +112,7 @@ void osc_register_methods(sosc_state_t *state) {
 	monome_t *monome;
 	lo_server srv;
 
-	prefix = state->osc_prefix;
+	prefix = state->config.app.osc_prefix;
 	monome = state->monome;
 	srv = state->server;
 
@@ -156,7 +156,7 @@ void osc_unregister_methods(sosc_state_t *state) {
 	monome_t *monome;
 	lo_server srv;
 
-	prefix = state->osc_prefix;
+	prefix = state->config.app.osc_prefix;
 	monome = state->monome;
 	srv = state->server;
 
