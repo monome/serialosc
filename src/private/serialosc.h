@@ -49,4 +49,7 @@ typedef struct {
 
 int event_loop(const sosc_state_t *state);
 
+int detector_run(const char *exec);
+void server_run(monome_t *monome);
+
 #endif /* defined __SERIALOSC_H_ */

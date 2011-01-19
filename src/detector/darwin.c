@@ -27,7 +27,7 @@
 
 #include <monome.h>
 
-#include "detector.h"
+#include "serialosc.h"
 
 
 typedef struct {

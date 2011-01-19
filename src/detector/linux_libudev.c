@@ -29,7 +29,6 @@
 #include <monome.h>
 
 #include "serialosc.h"
-#include "detector.h"
 
 
 typedef struct {
@@ -38,6 +37,7 @@ typedef struct {
 
 	const char *exec_path;
 } detector_state_t;
+
 
 static void disable_subproc_waiting() {
 	struct sigaction s;

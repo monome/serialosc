@@ -26,7 +26,6 @@
 #include <monome.h>
 
 #include "serialosc.h"
-#include "server.h"
 #include "osc.h"
 
 
