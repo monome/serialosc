@@ -128,11 +128,11 @@ style_warning () { att yellow bold; echo $*; att; }
 style_link    () { att blue bold underline; _echo $*; att; }
 
 cleanup () {
-	rm -rf .conftests
+	rm -rf .conftests;
 }
 
 bail() {
-	rm -rf .conftests;
+	cleanup;
 	exit 1;
 }
 
@@ -408,6 +408,11 @@ while [ -n "$1" ]; do
 			LO_PREFIX=$arg
 			;;
 
+		--libmonome-prefix=*)
+			fail_if_not_dir $arg;
+			LIBMONOME_PREFIX=$arg
+			;;
+
 	esac
 
 	shift;
@@ -417,10 +422,10 @@ CFLAGS="$CFLAGS -I$PREFIX/include"
 LDFLAGS="$LDFLAGS -L$PREFIX/lib"
 
 LO_CFLAGS="-I$LO_PREFIX/include $LO_CFLAGS"
-LO_LDFLAGS="-L$LO_PREFIX/lib $LO_LDFLAGS"
+LO_LDFLAGS="-L$LO_PREFIX/lib -Wl,-rpath,$LO_PREFIX/lib $LO_LDFLAGS"
 
 LIBMONOME_CFLAGS="-I$LIBMONOME_PREFIX/include $LIBMONOME_CFLAGS"
-LIBMONOME_LDFLAGS="-L$LIBMONOME_PREFIX/lib $LIBMONOME_LDFLAGS"
+LIBMONOME_LDFLAGS="-L$LIBMONOME_PREFIX/lib -Wl,-rpath,$LIBMONOME_PREFIX/lib $LIBMONOME_LDFLAGS"
 
 #
 # main course
