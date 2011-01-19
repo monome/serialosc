@@ -2,11 +2,9 @@ SHELL = /bin/sh
 
 include config.mk
 
-export CFLAGS  += -ggdb -Wall -Werror -DVERSION=\"$(VERSION)\" -std=c99 -pedantic
+export CFLAGS  += -ggdb -std=c99 -pedantic -Wall -Werror -DVERSION=\"$(VERSION)\"
 export LDFLAGS += -L$(LIBDIR)
-export INSTALL = install
-
-SUBDIRS = src
+export INSTALL  = install
 
 .SILENT:
 .SUFFIXES:

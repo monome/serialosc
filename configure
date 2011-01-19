@@ -50,6 +50,11 @@ LO_PREFIX=$PREFIX;
 LO_CFLAGS="";
 LO_LDFLAGS="-llo -lpthread";
 
+LIBCONFUSE_VERSION=;
+LIBCONFUSE_PREFIX=$PREFIX;
+LIBCONFUSE_CFLAGS="";
+LIBCONFUSE_LDFLAGS="-lconfuse";
+
 #
 # functions
 #
@@ -124,6 +129,16 @@ style_link    () { att blue bold underline; _echo $*; att; }
 
 cleanup () {
 	rm -rf .conftests
+}
+
+bail() {
+	rm -rf .conftests;
+	exit 1;
+}
+
+die() {
+	style_error $*;
+	bail;
 }
 
 # feature test commands
@@ -289,6 +304,40 @@ EOF
 	return 0;
 }
 
+check_libconfuse () {
+	cat <<EOF > .conftests/libconfuse.c
+#include <confuse.h>
+
+int main(int argc, char **argv) {
+	cfg_t *cfg;
+	cfg_opt_t opts[] = {
+		CFG_END()
+	};
+
+	if( !(cfg = cfg_init(opts, CFGF_NONE)) )
+		return 1;
+
+	cfg_free(cfg);
+
+	return 0;
+}
+EOF
+
+	compile_and_run libconfuse $LIBCONFUSE_CFLAGS $LIBCONFUSE_LDFLAGS;
+	RET=$?;
+
+	[ $RET -ne 0 ] && return $RET;
+
+	if [ $PKGCONFIG_VERSION ]; then
+		CMD="pkg-config --modversion libconfuse"
+		LIBCONFUSE_VERSION=`$CMD 2> /dev/null`
+
+		[ $? -ne 0 ] && return 0;
+	fi
+
+	return 0;
+}
+
 check_libmonome () {
 	cat <<EOF > .conftests/monome.c
 #include <monome.h>
@@ -410,8 +459,7 @@ case $PLATFORM in
 		echo "  Your platform is not currently supported by ${PROJECT}!  I'm sorry. :(";
 		echo "";
 
-		cleanup;
-		exit 1;
+		bail;
 		;;
 esac
 
@@ -430,8 +478,7 @@ else
 	echo   "  On Mac OS X, you'll need to install the Xcode developer tools or MacPorts.";
 	echo   "";
 
-	cleanup;
-	exit 1;
+	bail;
 fi
 
 conf_poll() {
@@ -445,40 +492,29 @@ conf_poll() {
 	fi
 }
 
-conf_poll;
-echo ""
+conf_libudev() {
+	echo_n "    checking for libudev:         ";
+	if check_libudev; then
+		style_success "libudev $LIBUDEV_VERSION";
+		PLATFORM=linux_libudev;
+		LDFLAGS="$LDFLAGS -ludev";
+	else
+		# why the fuck would you run a system this old
 
-if [ $PLATFORM = "linux" ]; then
-	conf_libudev() {
-		echo_n "    checking for libudev:         ";
-		if check_libudev; then
-			style_success "libudev $LIBUDEV_VERSION";
-			PLATFORM=linux_libudev;
-			LDFLAGS="$LDFLAGS -ludev";
-		else
-			# why the fuck would you run a system this old
+		style_error "no, your system is outdated"
+		bail;
+	fi
+}
 
-			style_error "no, your system is outdated"
-			cleanup;
-			exit 1;
-		fi
-	}
-
-	conf_dnssd() {
-		echo_n "    checking for libdns_sd:       ";
-		if check_dnssd; then
-			style_success "indeed";
-			LDFLAGS="$LDFLAGS -ldns_sd";
-		else
-			style_error "no mdns";
-			cleanup;
-			exit 1;
-		fi
-	}
-
-	conf_libudev;
-	conf_dnssd;
-fi
+conf_dnssd() {
+	echo_n "    checking for libdns_sd:       ";
+	if check_dnssd; then
+		style_success "indeed";
+		LDFLAGS="$LDFLAGS -ldns_sd";
+	else
+		die "no mdns";
+	fi
+}
 
 conf_liblo() {
 	echo_n "    checking for liblo:           ";
@@ -498,12 +534,9 @@ conf_liblo() {
 		echo_n "  get the source from the liblo homepage at "; style_link -n "http://liblo.sourceforge.net/"; echo ".";
 		echo   "";
 
-		cleanup;
-		exit 1;
+		bail;
 	fi
 }
-
-conf_liblo;
 
 conf_libmonome() {
 	echo_n "    checking for libmonome:       ";
@@ -511,10 +544,31 @@ conf_libmonome() {
 	if check_libmonome; then
 		style_success "libmonome $LIBMONOME_VERSION";
 	else
-		style_error "no libmonome :(";
+		die "no libmonome :(";
 	fi
 }
 
+conf_libconfuse() {
+	echo_n "    checking for libconfuse:      ";
+
+	if check_libconfuse; then
+		style_success "libconfuse $LIBCONFUSE_VERSION";
+	else
+		die "no libconfuse :(";
+	fi
+}
+
+conf_poll;
+
+echo ""
+
+if [ $PLATFORM = "linux" ]; then
+	conf_libudev;
+	conf_dnssd;
+fi
+
+conf_liblo;
+conf_libconfuse;
 conf_libmonome;
 
 echo "";
@@ -548,6 +602,9 @@ export LO_LDFLAGS = $LO_LDFLAGS
 
 export LIBMONOME_CFLAGS = $LIBMONOME_CFLAGS
 export LIBMONOME_LDFLAGS = $LIBMONOME_LDFLAGS
+
+export LIBCONFUSE_CFLAGS = $LIBCONFUSE_CFLAGS
+export LIBCONFUSE_LDFLAGS = $LIBCONFUSE_LDFLAGS
 EOF
 
 echo "";
