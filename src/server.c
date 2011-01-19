@@ -66,22 +66,24 @@ static void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 void server_run(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
-	if( !(state.server = lo_server_new(DEFAULT_OSC_SERVER_PORT, lo_error)) )
-		return;
+	if( sosc_read_device_config(monome_get_serial(state.monome),
+								&state.config) ) {
+		fprintf(
+			stderr, "serialosc [%s]: fatal error reading config file\n",
+			monome_get_serial(state.monome));
 
-	if( !(state.outgoing = lo_address_new(DEFAULT_OSC_APP_HOST,
-	                                      DEFAULT_OSC_APP_PORT)) ) {
+		return;
+	}
+
+	if( !(state.server = lo_server_new(state.config.server.port, lo_error)) )
+		goto err_server_new;
+
+	if( !(state.outgoing = lo_address_new(state.config.app.host,
+	                                      state.config.app.port)) ) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't allocate lo_address, aieee!\n",
 			monome_get_serial(state.monome));
 		goto err_lo_addr;
-	}
-
-	if( !(state.config.app.osc_prefix = strdup(DEFAULT_OSC_PREFIX)) ) {
-		fprintf(
-			stderr, "serialosc [%s]: can't strdup(), aieee!\n",
-			monome_get_serial(state.monome));
-		goto err_nomem;
 	}
 
 	DNSServiceRegister(
@@ -103,7 +105,7 @@ void server_run(monome_t *monome) {
 	monome_register_handler(state.monome, MONOME_BUTTON_UP,
 	                        handle_press, &state);
 
-	monome_set_rotation(state.monome, DEFAULT_ROTATION);
+	monome_set_rotation(state.monome, state.config.dev.rotation);
 	monome_clear(state.monome, MONOME_CLEAR_OFF);
 	monome_mode(state.monome, MONOME_MODE_NORMAL);
 
@@ -120,9 +122,10 @@ void server_run(monome_t *monome) {
 
 	DNSServiceRefDeallocate(state.ref);
 
-	free(state.config.app.osc_prefix);
-err_nomem:
 	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
+err_server_new:
+	free(state.config.app.osc_prefix);
+	free(state.config.app.host);
 }
