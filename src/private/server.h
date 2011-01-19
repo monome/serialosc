@@ -14,35 +14,4 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* for setenv */
-#define _XOPEN_SOURCE 600
-
-#include <stdlib.h>
-#include <monome.h>
-
-#include "serialosc.h"
-#include "detector.h"
-#include "server.h"
-
-
-int main(int argc, char **argv) {
-	monome_t *device;
-
-	if( argc < 2 ) {
-		/* run as the detector process */
-		if( detector_run(argv[0]) )
-			return EXIT_FAILURE;
-
-		return EXIT_SUCCESS;
-	}
-
-	/* run as a device OSC server */
-	if( !(device = monome_open(argv[1])) )
-		return EXIT_FAILURE;
-
-	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
-	server_run(device);
-	monome_close(device);
-
-	return EXIT_SUCCESS;
-}
+void server_run(monome_t *monome);

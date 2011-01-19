@@ -2,6 +2,7 @@ CFLAGS += -I./private $(LO_CFLAGS) $(LIBMONOME_CFLAGS)
 LDFLAGS += $(LO_LDFLAGS) $(LIBMONOME_LDFLAGS)
 
 SERIALOSC_OBJS  = serialosc.o
+SERIALOSC_OBJS += server.o
 SERIALOSC_OBJS += osc.o
 SERIALOSC_OBJS += osc_methods.o
 SERIALOSC_OBJS += osc_sys_methods.o
