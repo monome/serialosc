@@ -126,19 +126,13 @@ void server_run(monome_t *monome) {
 
 	DNSServiceRefDeallocate(state.ref);
 
-	lo_address_free(state.outgoing);
-
-	/* set configuration parameters from server params */
-	sosc_port_itos(state.config.server.port, lo_server_get_port(state.server));
-	strncpy(state.config.app.port, lo_address_get_port(state.outgoing), 6);
-	state.config.app.port[5] = '\0';
-
-	if( sosc_config_write(monome_get_serial(state.monome), &state.config) ) {
+	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't write config :(\n",
 			monome_get_serial(state.monome));
 	}
 
+	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
 err_server_new:

@@ -24,6 +24,7 @@
 
 #include <confuse.h>
 #include <monome.h>
+#include <lo/lo.h>
 
 #include "serialosc.h"
 
@@ -152,9 +153,10 @@ int sosc_config_read(const char *serial, sosc_config_t *config) {
 	return 0;
 }
 
-int sosc_config_write(const char *serial, sosc_config_t *config) {
+int sosc_config_write(const char *serial, sosc_state_t *state) {
 	cfg_t *cfg, *sec;
 	char *path;
+	const char *p;
 	FILE *f;
 
 	if( !serial )
@@ -171,15 +173,16 @@ int sosc_config_write(const char *serial, sosc_config_t *config) {
 	free(path);
 
 	sec = cfg_getsec(cfg, "server");
-	cfg_setint(sec, "port", atoi(config->server.port));
+	cfg_setint(sec, "port", lo_server_get_port(state->server));
 
 	sec = cfg_getsec(cfg, "application");
-	cfg_setstr(sec, "osc_prefix", config->app.osc_prefix);
-	cfg_setstr(sec, "host", config->app.host);
-	cfg_setint(sec, "port", atoi(config->app.port));
+	cfg_setstr(sec, "osc_prefix", state->config.app.osc_prefix);
+	cfg_setstr(sec, "host", lo_address_get_hostname(state->outgoing));
+	p = lo_address_get_port(state->outgoing);
+	cfg_setint(sec, "port", strtol(p , NULL, 10));
 
 	sec = cfg_getsec(cfg, "device");
-	cfg_setint(sec, "rotation", config->dev.rotation * 90);
+	cfg_setint(sec, "rotation", monome_get_rotation(state->monome) * 90);
 
 	cfg_print(cfg, f);
 	fclose(f);
