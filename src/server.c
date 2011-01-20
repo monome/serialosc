@@ -42,6 +42,12 @@ static void lo_error(int num, const char *error_msg, const char *path) {
 	fflush(stderr);
 }
 
+static const char *null_if_zero(const char *s) {
+	if( !*s )
+		return NULL;
+	return s;
+}
+
 static void handle_press(const monome_event_t *e, void *data) {
 	sosc_state_t *state = data;
 	char *cmd;
@@ -66,20 +72,18 @@ static void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 void server_run(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 
-	if( sosc_read_device_config(monome_get_serial(state.monome),
-								&state.config) ) {
+	if( sosc_config_read(monome_get_serial(state.monome), &state.config) ) {
 		fprintf(
-			stderr, "serialosc [%s]: fatal error reading config file\n",
+			stderr, "serialosc [%s]: couldn't read config, using defaults\n",
 			monome_get_serial(state.monome));
-
-		return;
 	}
 
-	if( !(state.server = lo_server_new(state.config.server.port, lo_error)) )
+	if( !(state.server = lo_server_new(null_if_zero(state.config.server.port),
+									   lo_error)) )
 		goto err_server_new;
 
-	if( !(state.outgoing = lo_address_new(state.config.app.host,
-	                                      state.config.app.port)) ) {
+	if( !(state.outgoing = lo_address_new(
+				state.config.app.host, null_if_zero(state.config.app.port))) ) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't allocate lo_address, aieee!\n",
 			monome_get_serial(state.monome));
@@ -123,6 +127,18 @@ void server_run(monome_t *monome) {
 	DNSServiceRefDeallocate(state.ref);
 
 	lo_address_free(state.outgoing);
+
+	/* set configuration parameters from server params */
+	sosc_port_itos(state.config.server.port, lo_server_get_port(state.server));
+	strncpy(state.config.app.port, lo_address_get_port(state.outgoing), 6);
+	state.config.app.port[5] = '\0';
+
+	if( sosc_config_write(monome_get_serial(state.monome), &state.config) ) {
+		fprintf(
+			stderr, "serialosc [%s]: couldn't write config :(\n",
+			monome_get_serial(state.monome));
+	}
+
 err_lo_addr:
 	lo_server_free(state.server);
 err_server_new:

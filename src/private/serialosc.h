@@ -52,6 +52,10 @@ int event_loop(const sosc_state_t *state);
 int detector_run(const char *exec);
 void server_run(monome_t *monome);
 
-int sosc_read_device_config(const char *serial, sosc_config_t *config);
+int sosc_config_create_directory();
+int sosc_config_read(const char *serial, sosc_config_t *config);
+int sosc_config_write(const char *serial, sosc_config_t *config);
+
+void sosc_port_itos(char *dest, long int port);
 
 #endif /* defined __SERIALOSC_H_ */

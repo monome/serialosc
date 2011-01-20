@@ -19,6 +19,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <sys/stat.h>
 
 #include <confuse.h>
 #include <monome.h>
@@ -58,13 +60,6 @@ static cfg_opt_t opts[] = {
 };
 
 
-static void set_port_if_not_zero(char *dest, long int port) {
-	if( port )
-		snprintf(dest, sizeof(char) * 6, "%ld", port);
-	else
-		*dest = '\0';
-}
-
 static void prepend_slash_if_necessary(char **dest, char *prefix) {
 	if( *prefix != '/' )
 		asprintf(dest, "/%s", prefix);
@@ -72,7 +67,57 @@ static void prepend_slash_if_necessary(char **dest, char *prefix) {
 		*dest = strdup(prefix);
 }
 
-int sosc_read_device_config(const char *serial, sosc_config_t *config) {
+static char *config_directory() {
+	char *dir;
+#ifdef DARWIN
+	asprintf(&dir, "%s/Library/Preferences/org.monome.serialosc", getenv("HOME"));
+#else
+	if( getenv("XDG_CONFIG_HOME") )
+		asprintf(&dir, "%s/serialosc", getenv("XDG_CONFIG_HOME"));
+	else
+		asprintf(&dir, "%s/.config/serialosc", getenv("HOME"));
+#endif
+
+	return dir;
+}
+
+static char *path_for_serial(const char *serial) {
+	char *path, *cdir;
+
+	cdir = config_directory();
+
+	asprintf(&path, "%s/%s.conf", cdir, serial);
+
+	free(cdir);
+	return path;
+}
+
+int sosc_config_create_directory() {
+	char *cdir = config_directory();
+	struct stat buf[1];
+
+	if( !stat(cdir, buf) )
+		return 0; /* all is well */
+
+#ifndef DARWIN
+	if( !getenv("XDG_CONFIG_HOME") ) {
+		/* well, I guess somebody's got to do it */
+		char *xdgdir;
+		asprintf(&xdgdir, "%s/.config", getenv("HOME"));
+		if( mkdir(xdgdir, S_IRWXU) )
+			return 1;
+
+		free(xdgdir);
+	}
+#endif
+
+	if( mkdir(cdir, S_IRWXU) )
+		return 1;
+
+	return 0;
+}
+
+int sosc_config_read(const char *serial, sosc_config_t *config) {
 	cfg_t *cfg, *sec;
 	char *path;
 
@@ -80,13 +125,9 @@ int sosc_read_device_config(const char *serial, sosc_config_t *config) {
 		return 1;
 
 	cfg = cfg_init(opts, CFGF_NOCASE);
-	asprintf(&path, "%s/serialosc/%s.conf", getenv("XDG_CONFIG_HOME"), serial);
+	path = path_for_serial(serial);
 
 	switch( cfg_parse(cfg, path) ) {
-	case CFG_FILE_ERROR:
-		perror(serial);
-		break;
-
 	case CFG_PARSE_ERROR:
 		fprintf(stderr, "serialosc [%s]: parse error in saved configuration\n",
 				serial);
@@ -96,17 +137,52 @@ int sosc_read_device_config(const char *serial, sosc_config_t *config) {
 	free(path);
 
 	sec = cfg_getsec(cfg, "server");
-	set_port_if_not_zero(config->server.port, cfg_getint(sec, "port"));
+	sosc_port_itos(config->server.port, cfg_getint(sec, "port"));
 
 	sec = cfg_getsec(cfg, "application");
 	prepend_slash_if_necessary(&config->app.osc_prefix, cfg_getstr(sec, "osc_prefix"));
 	config->app.host = strdup(cfg_getstr(sec, "host"));
-	set_port_if_not_zero(config->app.port, cfg_getint(sec, "port"));
+	sosc_port_itos(config->app.port, cfg_getint(sec, "port"));
 
 	sec = cfg_getsec(cfg, "device");
 	config->dev.rotation = (cfg_getint(sec, "rotation") / 90) % 4;
 
 	cfg_free(cfg);
+
+	return 0;
+}
+
+int sosc_config_write(const char *serial, sosc_config_t *config) {
+	cfg_t *cfg, *sec;
+	char *path;
+	FILE *f;
+
+	if( !serial )
+		return 1;
+
+	cfg = cfg_init(opts, CFGF_NOCASE);
+
+	path = path_for_serial(serial);
+	if( !(f = fopen(path, "w")) ) {
+		free(path);
+		return 1;
+	}
+
+	free(path);
+
+	sec = cfg_getsec(cfg, "server");
+	cfg_setint(sec, "port", atoi(config->server.port));
+
+	sec = cfg_getsec(cfg, "application");
+	cfg_setstr(sec, "osc_prefix", config->app.osc_prefix);
+	cfg_setstr(sec, "host", config->app.host);
+	cfg_setint(sec, "port", atoi(config->app.port));
+
+	sec = cfg_getsec(cfg, "device");
+	cfg_setint(sec, "rotation", config->dev.rotation * 90);
+
+	cfg_print(cfg, f);
+	fclose(f);
 
 	return 0;
 }
