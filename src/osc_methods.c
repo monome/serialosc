@@ -84,21 +84,14 @@ static int osc_frame_handler(const char *path, const char *types,
 	int i;
 
 	for( i = 0; i < 8; i++ )
-		buf[i] = argv[i]->i;
+		buf[i] = argv[i + (argc - 8)]->i;
 
 	switch( argc ) {
 	case 8:
-		return monome_led_frame(monome, 0, buf);
-
-	case 9:
-		return monome_led_frame(monome, argv[8]->i, buf);
+		return monome_led_frame(monome, 0, 0, buf);
 
 	case 10:
-		i = (argv[0]->i / 8) + ((argv[1]->i / 8) * 2);
-		return monome_led_frame(monome, i, buf);
-
-	default:
-		break;
+		return monome_led_frame(monome, argv[0]->i, argv[1]->i, buf);
 	}
 
 	return -1;
@@ -144,7 +137,6 @@ void osc_register_methods(sosc_state_t *state) {
 
 	METHOD("frame") {
 		REGISTER("iiiiiiii", osc_frame_handler);
-		REGISTER("iiiiiiiii", osc_frame_handler);
 		REGISTER("iiiiiiiiii", osc_frame_handler);
 	}
 
@@ -188,7 +180,6 @@ void osc_unregister_methods(sosc_state_t *state) {
 
 	METHOD("frame") {
 		UNREGISTER("iiiiiiii");
-		UNREGISTER("iiiiiiiii");
 		UNREGISTER("iiiiiiiiii");
 	}
 
