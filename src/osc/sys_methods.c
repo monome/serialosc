@@ -26,9 +26,102 @@
 #include "osc.h"
 
 
+/**
+ * utils
+ */
+
 static int portstr(char *dest, int src) {
 	return snprintf(dest, 6, "%d", src);
 }
+
+/**
+ * /sys/info business
+ */
+
+typedef void (info_reply_func_t)(lo_address *, sosc_state_t *);
+
+static int info_prop_handler(lo_arg **argv, int argc, void *user_data,
+                              info_reply_func_t cb) {
+	sosc_state_t *state = user_data;
+	const char *host = NULL;
+	char port[6];
+	lo_address *dst;
+
+	if( argc == 2 )
+		host = &argv[0]->s;
+	else
+		host = lo_address_get_hostname(state->outgoing);
+
+	portstr(port, argv[argc - 1]->i);
+
+	if( !(dst = lo_address_new(host, port)) ) {
+		fprintf(stderr, "sys_info_handler(): error in lo_address_new()");
+		return 1;
+	}
+
+	cb(dst, state);
+	lo_address_free(dst);
+
+	return 0;
+}
+
+static int info_prop_handler_default(void *user_data, info_reply_func_t cb) {
+	sosc_state_t *state = user_data;
+	cb(state->outgoing, state);
+	return 0;
+}
+
+#define DECLARE_INFO_REPLY_FUNC(prop, typetag, ...)\
+	static void info_reply_##prop(lo_address *to, sosc_state_t *state) {\
+		lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/" #prop,\
+					 typetag, __VA_ARGS__);\
+	}
+
+#define DECLARE_INFO_HANDLERS(prop)\
+	static int sys_info_##prop##_handler(\
+		const char *path, const char *types, lo_arg **argv, int argc,\
+		lo_message data, void *user_data) {\
+		return info_prop_handler(argv, argc, user_data, info_reply_##prop);\
+	}\
+	static int sys_info_##prop##_handler_default(\
+		const char *path, const char *types, lo_arg **argv, int argc,\
+		lo_message data, void *user_data) {\
+		return info_prop_handler_default(user_data, info_reply_##prop);\
+	}
+
+#define DECLARE_INFO_PROP(prop, typetag, ...)\
+	DECLARE_INFO_REPLY_FUNC(prop, typetag, __VA_ARGS__)\
+	DECLARE_INFO_HANDLERS(prop)
+
+DECLARE_INFO_PROP(id, "s", monome_get_serial(state->monome))
+DECLARE_INFO_PROP(size, "ii", monome_get_cols(state->monome),
+                  monome_get_rows(state->monome))
+DECLARE_INFO_PROP(host, "s", lo_address_get_hostname(state->outgoing))
+DECLARE_INFO_PROP(port, "i", atoi(lo_address_get_port(state->outgoing)))
+DECLARE_INFO_PROP(prefix, "s", state->config.app.osc_prefix)
+
+static void info_reply_all(lo_address *to, sosc_state_t *state) {
+	info_reply_id(to, state);
+	info_reply_size(to, state);
+	info_reply_host(to, state);
+	info_reply_port(to, state);
+	info_reply_prefix(to, state);
+}
+
+static int sys_info_handler(const char *path, const char *types,
+                            lo_arg **argv, int argc,
+                            lo_message data, void *user_data) {
+	return info_prop_handler(argv, argc, user_data, info_reply_all);
+}
+
+static int sys_info_handler_default(const char *path, const char *types,
+                                    lo_arg **argv, int argc,
+                                    lo_message data, void *user_data) {
+	return info_prop_handler_default(user_data, info_reply_all);
+}
+
+/**/
+ 
 
 static int sys_mode_handler(const char *path, const char *types,
                             lo_arg **argv, int argc,
@@ -85,45 +178,6 @@ static int sys_rotation_handler(const char *path, const char *types,
 	case 270: monome_set_rotation(monome, MONOME_ROTATE_270); return 0;
 	default:  return 1;
 	}
-}
-
-static void send_info(lo_address *to, sosc_state_t *state) {
-	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/info", "siisis",
-	             monome_get_serial(state->monome),
-	             monome_get_rows(state->monome),
-	             monome_get_cols(state->monome),
-	             lo_address_get_hostname(state->outgoing),
-	             atoi(lo_address_get_port(state->outgoing)),
-	             state->config.app.osc_prefix);
-}
-
-static int sys_info_handler(const char *path, const char *types,
-                            lo_arg **argv, int argc,
-                            lo_message data, void *user_data) {
-	sosc_state_t *state = user_data;
-	char port[6], *host = NULL;
-	lo_address *dst;
-
-	host = ( argc == 2 ) ? &argv[0]->s : NULL;
-	portstr(port, argv[argc - 1]->i);
-
-	if( !(dst = lo_address_new(host, port)) ) {
-		fprintf(stderr, "sys_info_handler(): error in lo_address_new()");
-		return 1;
-	}
-
-	send_info(dst, state);
-	lo_address_free(dst);
-
-	return 0;
-}
-
-static int sys_info_handler_default(const char *path, const char *types,
-                                    lo_arg **argv, int argc,
-                                    lo_message data, void *user_data) {
-	sosc_state_t *state = user_data;
-	send_info(state->outgoing, state);
-	return 0;
 }
 
 static int sys_port_handler(const char *path, const char *types,
@@ -205,6 +259,24 @@ void osc_register_sys_methods(sosc_state_t *state) {
 #define METHOD(path) for( cmd = "/sys/" path; cmd; cmd = NULL )
 #define REGISTER(types, handler, context) \
 	lo_server_add_method(state->server, cmd, types, handler, context)
+#define REGISTER_INFO_PROP(prop) do {\
+	METHOD("info/" #prop) {\
+		REGISTER("si", sys_info_##prop##_handler, state);\
+		REGISTER("i", sys_info_##prop##_handler, state);\
+		REGISTER("", sys_info_##prop##_handler_default, state);\
+	} } while ( 0 )
+
+	REGISTER_INFO_PROP(id);
+	REGISTER_INFO_PROP(size);
+	REGISTER_INFO_PROP(host);
+	REGISTER_INFO_PROP(port);
+	REGISTER_INFO_PROP(prefix);
+
+	METHOD("info") {
+		REGISTER("si", sys_info_handler, state);
+		REGISTER("i", sys_info_handler, state);
+		REGISTER("", sys_info_handler_default, state);
+	}
 
 	METHOD("mode")
 		REGISTER("i", sys_mode_handler, state->monome);
@@ -214,12 +286,6 @@ void osc_register_sys_methods(sosc_state_t *state) {
 
 	METHOD("rotation")
 		REGISTER("i", sys_rotation_handler, state->monome);
-
-	METHOD("info") {
-		REGISTER("si", sys_info_handler, state);
-		REGISTER("i", sys_info_handler, state);
-		REGISTER("", sys_info_handler_default, state);
-	}
 
 	METHOD("port")
 		REGISTER("i", sys_port_handler, state);
