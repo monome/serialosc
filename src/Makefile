@@ -5,9 +5,9 @@ SERIALOSC_OBJS  = serialosc.o
 SERIALOSC_OBJS += util.o
 SERIALOSC_OBJS += server.o
 SERIALOSC_OBJS += config.o
-SERIALOSC_OBJS += osc.o
-SERIALOSC_OBJS += osc_methods.o
-SERIALOSC_OBJS += osc_sys_methods.o
+SERIALOSC_OBJS += osc/util.o
+SERIALOSC_OBJS += osc/methods.o
+SERIALOSC_OBJS += osc/sys_methods.o
 
 SERIALOSC_OBJS += detector/$(PLATFORM).o
 SERIALOSC_OBJS += event_loop/$(EVLOOP).o
