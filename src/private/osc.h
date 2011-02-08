@@ -16,6 +16,12 @@
 
 #include "serialosc.h"
 
+/* typing the whole signature out everywhere sucks a lot */
+#define OSC_HANDLER_FUNC(x)\
+	static int x(const char *path, const char *types,\
+				 lo_arg **argv, int argc,\
+				 lo_message data, void *user_data)
+
 void osc_register_sys_methods(sosc_state_t *state);
 
 void osc_register_methods(sosc_state_t *state);

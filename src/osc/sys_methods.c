@@ -78,14 +78,10 @@ static int info_prop_handler_default(void *user_data, info_reply_func_t cb) {
 	}
 
 #define DECLARE_INFO_HANDLERS(prop)\
-	static int sys_info_##prop##_handler(\
-		const char *path, const char *types, lo_arg **argv, int argc,\
-		lo_message data, void *user_data) {\
+	OSC_HANDLER_FUNC(sys_info_##prop##_handler) {\
 		return info_prop_handler(argv, argc, user_data, info_reply_##prop);\
 	}\
-	static int sys_info_##prop##_handler_default(\
-		const char *path, const char *types, lo_arg **argv, int argc,\
-		lo_message data, void *user_data) {\
+	OSC_HANDLER_FUNC(sys_info_##prop##_handler_default) {\
 		return info_prop_handler_default(user_data, info_reply_##prop);\
 	}
 
@@ -108,32 +104,24 @@ static void info_reply_all(lo_address *to, sosc_state_t *state) {
 	info_reply_prefix(to, state);
 }
 
-static int sys_info_handler(const char *path, const char *types,
-                            lo_arg **argv, int argc,
-                            lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_info_handler) {
 	return info_prop_handler(argv, argc, user_data, info_reply_all);
 }
 
-static int sys_info_handler_default(const char *path, const char *types,
-                                    lo_arg **argv, int argc,
-                                    lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_info_handler_default) {
 	return info_prop_handler_default(user_data, info_reply_all);
 }
 
 /**/
  
 
-static int sys_mode_handler(const char *path, const char *types,
-                            lo_arg **argv, int argc,
-                            lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_mode_handler) {
 	monome_t *monome = user_data;
 
 	return monome_mode(monome, argv[0]->i);
 }
 
-static int sys_cable_legacy_handler(const char *path, const char *types,
-                             lo_arg **argv, int argc,
-                             lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_cable_legacy_handler) {
 	monome_t *monome = user_data;
 
 	switch( argv[0]->s ) {
@@ -166,9 +154,7 @@ static int sys_cable_legacy_handler(const char *path, const char *types,
 	}
 }
 
-static int sys_rotation_handler(const char *path, const char *types,
-                             lo_arg **argv, int argc,
-                             lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_rotation_handler) {
 	monome_t *monome = user_data;
 
 	switch( argv[0]->i ) {
@@ -180,9 +166,7 @@ static int sys_rotation_handler(const char *path, const char *types,
 	}
 }
 
-static int sys_port_handler(const char *path, const char *types,
-                            lo_arg **argv, int argc,
-                            lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_port_handler) {
 	sosc_state_t *state = user_data;
 	lo_address *new, *old = state->outgoing;
 	char port[6];
@@ -205,9 +189,7 @@ static int sys_port_handler(const char *path, const char *types,
 	return 0;
 }
 
-static int sys_host_handler(const char *path, const char *types,
-                            lo_arg **argv, int argc,
-                            lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_host_handler) {
 	sosc_state_t *state = user_data;
 	lo_address *new, *old = state->outgoing;
 
@@ -227,9 +209,7 @@ static int sys_host_handler(const char *path, const char *types,
 	return 0;
 }
 
-static int sys_prefix_handler(const char *path, const char *types,
-                              lo_arg **argv, int argc,
-                              lo_message data, void *user_data) {
+OSC_HANDLER_FUNC(sys_prefix_handler) {
 	sosc_state_t *state = user_data;
 	char *new, *old = state->config.app.osc_prefix;
 
