@@ -39,11 +39,7 @@ OSC_HANDLER_FUNC(osc_intensity_handler) {
 
 OSC_HANDLER_FUNC(osc_led_handler) {
 	monome_t *monome = user_data;
-
-	if( argv[2]->i )
-		return monome_led_on(monome, argv[0]->i, argv[1]->i);
-	else
-		return monome_led_off(monome, argv[0]->i, argv[1]->i);
+	return monome_led(monome, argv[0]->i, argv[1]->i, argv[2]->i);
 }
 
 OSC_HANDLER_FUNC(osc_led_col_handler) {
