@@ -61,7 +61,7 @@ static int osc_led_col_handler(const char *path, const char *types,
 	if( argc == 3 )
 		buf[1] = argv[2]->i;
 
-	return monome_led_col(monome, argv[0]->i, argc - 1, buf);
+	return monome_led_col(monome, argv[0]->i, 0, argc - 1, buf);
 }
 
 static int osc_led_row_handler(const char *path, const char *types,
@@ -73,7 +73,7 @@ static int osc_led_row_handler(const char *path, const char *types,
 	if( argc == 3 )
 		buf[1] = argv[2]->i;
 
-	return monome_led_row(monome, argv[0]->i, argc - 1, buf);
+	return monome_led_row(monome, argv[0]->i, 0, argc - 1, buf);
 }
 
 static int osc_frame_handler(const char *path, const char *types,
