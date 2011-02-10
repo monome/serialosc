@@ -6,7 +6,7 @@ SERIALOSC_OBJS += util.o
 SERIALOSC_OBJS += server.o
 SERIALOSC_OBJS += config.o
 SERIALOSC_OBJS += osc/util.o
-SERIALOSC_OBJS += osc/methods.o
+SERIALOSC_OBJS += osc/mext_methods.o
 SERIALOSC_OBJS += osc/sys_methods.o
 
 SERIALOSC_OBJS += detector/$(PLATFORM).o
