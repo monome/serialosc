@@ -110,7 +110,7 @@ void server_run(monome_t *monome) {
 	                        handle_press, &state);
 
 	monome_set_rotation(state.monome, state.config.dev.rotation);
-	monome_clear(state.monome, MONOME_CLEAR_OFF);
+	monome_led_all(state.monome, 0);
 	monome_mode(state.monome, MONOME_MODE_NORMAL);
 
 	osc_register_sys_methods(&state);

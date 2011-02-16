@@ -25,14 +25,13 @@
 
 OSC_HANDLER_FUNC(led_set_handler) {
 	monome_t *monome = user_data;
-	return monome_led(monome, argv[0]->i, argv[1]->i, !!argv[2]->i);
+	return monome_led_set(monome, argv[0]->i, argv[1]->i, !!argv[2]->i);
 }
 
 OSC_HANDLER_FUNC(led_all_handler) {
 	monome_t *monome = user_data;
 
-	/* XXX: monome_clear() should be monome_all() */
-	return monome_clear(monome, !!argv[0]->i);
+	return monome_led_all(monome, !!argv[0]->i);
 }
 
 OSC_HANDLER_FUNC(led_map_handler) {
@@ -43,7 +42,7 @@ OSC_HANDLER_FUNC(led_map_handler) {
 	for( i = 0; i < 8; i++ )
 		buf[i] = argv[i + (argc - 8)]->i;
 
-	return monome_led_frame(monome, argv[0]->i, argv[1]->i, buf);
+	return monome_led_map(monome, argv[0]->i, argv[1]->i, buf);
 }
 
 OSC_HANDLER_FUNC(led_col_handler) {
@@ -86,7 +85,7 @@ OSC_HANDLER_FUNC(led_row_handler) {
 
 OSC_HANDLER_FUNC(led_intensity_handler) {
 	monome_t *monome = user_data;
-	return monome_intensity(monome, argv[0]->i);
+	return monome_led_intensity(monome, argv[0]->i);
 }
 
 #define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
