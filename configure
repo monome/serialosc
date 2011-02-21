@@ -21,7 +21,7 @@
 #
 
 PROJECT="serialosc";
-VERSION="0.7-git";
+VERSION="0.9";
 
 CC="gcc";
 LD="\$(CC)";
@@ -39,6 +39,9 @@ MANDIR=;
 
 EVLOOP="poll";
 LIBUDEV_VERSION=;
+
+DNSSD_CFLAGS=;
+DNSSD_LDFLAGS="-ldns_sd";
 
 LIBMONOME_VERSION=;
 LIBMONOME_PREFIX=$PREFIX;
@@ -155,7 +158,7 @@ compile_and_run() {
 	FILE=$1
 	shift;
 
-	CMD="$CC $CFLAGS $LDFLAGS $* .conftests/$FILE.c -o .conftests/$FILE"
+	CMD="$CC $CFLAGS .conftests/$FILE.c -o .conftests/$FILE $LDFLAGS $*"
 	try_command $CMD;
 	RET=$?;
 
@@ -267,7 +270,7 @@ int main(int argc, char **argv) {
 }
 EOF
 
-	compile_and_run dnssd "" "-ldns_sd";
+	compile_and_run dnssd $DNSSD_CFLAGS $DNSSD_LDFLAGS;
 	RET=$?;
 
 	[ $RET -ne 0 ] && return $RET;
@@ -458,6 +461,18 @@ case $PLATFORM in
 		export PKG_CONFIG_PATH=/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/opt/local/lib/pkgconfig:$PKG_CONFIG_PATH
 		;;
 
+	MINGW*|mingw*)
+		LIBSUFFIX=dll;
+		PLATFORM=windows;
+
+		CFLAGS="$CFLAGS -DWIN32";
+
+		LO_LDFLAGS="$LO_LDFLAGS -lws2_32";
+		LIBCONFUSE_LDFLAGS="$LIBCONFUSE_LDFLAGS -lintl";
+
+		DNSSD_LDFLAGS="-ldnssd";
+		;;
+
 	*)
 		style_error $PLATFORM;
 
@@ -516,7 +531,8 @@ conf_dnssd() {
 	echo_n "    checking for libdns_sd:       ";
 	if check_dnssd; then
 		style_success "indeed";
-		LDFLAGS="$LDFLAGS -ldns_sd";
+		CFLAGS="$CFLAGS $DNSSD_CFLAGS";
+		LDFLAGS="$LDFLAGS $DNSSD_LDFLAGS";
 	else
 		die "no mdns";
 	fi
@@ -570,6 +586,9 @@ echo ""
 
 if [ $PLATFORM = "linux" ]; then
 	conf_libudev;
+fi
+
+if [ $PLATFORM != "darwin" ]; then
 	conf_dnssd;
 fi
 
