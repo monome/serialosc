@@ -21,6 +21,57 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+
+#include <direct.h>
+
+#include "platform.h"
+
+static int mk_monome_dir(char *cdir) {
+	int ret = 0;
+	char *last_slash = strrchr(cdir, '\\');
+	struct _stat buf[1];
+	*last_slash = '\0';
+
+	if( _mkdir(cdir) && errno != EEXIST )
+		ret = 1;
+
+	*last_slash = '\\';
+	return ret;
+}
+
+char *sosc_get_config_directory() {
+	char *appdata, *dir;
+
+	if( !(appdata = getenv("LOCALAPPDATA")) )
+		appdata = getenv("APPDATA");
+
+	return s_asprintf("%s\\Monome\\serialosc", appdata);
+}
+
+int sosc_config_create_directory() {
+	char *cdir, *xdgdir;
+	struct _stat buf[1];
+
+	cdir = sosc_get_config_directory();
+	if( !_stat(cdir, buf) )
+		return 0; /* all is well */
+
+	if( mk_monome_dir(cdir) )
+		goto err_mkdir;
+
+	if( _mkdir(cdir, S_IRWXU) )
+		goto err_mkdir;
+
+	s_free(cdir);
+	return 0;
+
+err_mkdir:
+	s_free(cdir);
+	return 1;
+}
 
 char *s_asprintf(const char *fmt, ...) {
 	va_list args;

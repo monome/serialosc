@@ -1,8 +1,8 @@
 CFLAGS += -I./private $(LO_CFLAGS) $(LIBMONOME_CFLAGS) $(LIBCONFUSE_CFLAGS)
 LDFLAGS += $(LO_LDFLAGS) $(LIBMONOME_LDFLAGS) $(LIBCONFUSE_LDFLAGS)
 
-PLATFORM_linux_OBJS   = platform/posix.o
-PLATFORM_darwin_OBJS  = platform/posix.o
+PLATFORM_linux_OBJS   = platform/posix.o platform/linux.o
+PLATFORM_darwin_OBJS  = platform/posix.o platform/darwin.o
 PLATFORM_windows_OBJS = platform/windows.o
 
 SERIALOSC_OBJS  = serialosc.o

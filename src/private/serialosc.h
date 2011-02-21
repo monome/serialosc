@@ -21,6 +21,8 @@
 #ifndef SERIALOSC_H
 #define SERIALOSC_H
 
+#include "platform.h"
+
 typedef struct {
 	struct {
 		char port[6];
@@ -46,12 +48,6 @@ typedef struct {
 
 	sosc_config_t config;
 } sosc_state_t;
-
-char *s_asprintf(const char *fmt, ...);
-void *s_malloc(size_t size);
-void *s_calloc(size_t nmemb, size_t size);
-void *s_strdup(const char *s);
-void s_free(void *ptr);
 
 int event_loop(const sosc_state_t *state);
 

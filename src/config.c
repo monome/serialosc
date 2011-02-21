@@ -66,53 +66,14 @@ static void prepend_slash_if_necessary(char **dest, char *prefix) {
 		*dest = s_strdup(prefix);
 }
 
-static char *config_directory() {
-	char *dir;
-#ifdef DARWIN
-	dir = s_asprintf("%s/Library/Preferences/org.monome.serialosc", getenv("HOME"));
-#else
-	if( getenv("XDG_CONFIG_HOME") )
-		dir = s_asprintf("%s/serialosc", getenv("XDG_CONFIG_HOME"));
-	else
-		dir = s_asprintf("%s/.config/serialosc", getenv("HOME"));
-#endif
-
-	return dir;
-}
-
 static char *path_for_serial(const char *serial) {
 	char *path, *cdir;
 
-	cdir = config_directory();
+	cdir = sosc_get_config_directory();
 	path = s_asprintf("%s/%s.conf", cdir, serial);
 
 	s_free(cdir);
 	return path;
-}
-
-int sosc_config_create_directory() {
-	char *cdir = config_directory();
-	struct stat buf[1];
-
-	if( !stat(cdir, buf) )
-		return 0; /* all is well */
-
-#ifndef DARWIN
-	if( !getenv("XDG_CONFIG_HOME") ) {
-		/* well, I guess somebody's got to do it */
-		char *xdgdir;
-		xdgdir = s_asprintf("%s/.config", getenv("HOME"));
-		if( mkdir(xdgdir, S_IRWXU) )
-			return 1;
-
-		s_free(xdgdir);
-	}
-#endif
-
-	if( mkdir(cdir, S_IRWXU) )
-		return 1;
-
-	return 0;
 }
 
 int sosc_config_read(const char *serial, sosc_config_t *config) {
