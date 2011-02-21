@@ -57,7 +57,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
-static void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
+static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
                    DNSServiceErrorType errorCode, const char *name,
                    const char *regtype, const char *domain, void *context) {
 
