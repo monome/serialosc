@@ -14,8 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* for vasprintf */
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -63,20 +61,20 @@ static cfg_opt_t opts[] = {
 
 static void prepend_slash_if_necessary(char **dest, char *prefix) {
 	if( *prefix != '/' )
-		asprintf(dest, "/%s", prefix);
+		*dest = s_asprintf("/%s", prefix);
 	else
-		*dest = strdup(prefix);
+		*dest = s_strdup(prefix);
 }
 
 static char *config_directory() {
 	char *dir;
 #ifdef DARWIN
-	asprintf(&dir, "%s/Library/Preferences/org.monome.serialosc", getenv("HOME"));
+	dir = s_asprintf("%s/Library/Preferences/org.monome.serialosc", getenv("HOME"));
 #else
 	if( getenv("XDG_CONFIG_HOME") )
-		asprintf(&dir, "%s/serialosc", getenv("XDG_CONFIG_HOME"));
+		dir = s_asprintf("%s/serialosc", getenv("XDG_CONFIG_HOME"));
 	else
-		asprintf(&dir, "%s/.config/serialosc", getenv("HOME"));
+		dir = s_asprintf("%s/.config/serialosc", getenv("HOME"));
 #endif
 
 	return dir;
@@ -86,10 +84,9 @@ static char *path_for_serial(const char *serial) {
 	char *path, *cdir;
 
 	cdir = config_directory();
+	path = s_asprintf("%s/%s.conf", cdir, serial);
 
-	asprintf(&path, "%s/%s.conf", cdir, serial);
-
-	free(cdir);
+	s_free(cdir);
 	return path;
 }
 
@@ -104,11 +101,11 @@ int sosc_config_create_directory() {
 	if( !getenv("XDG_CONFIG_HOME") ) {
 		/* well, I guess somebody's got to do it */
 		char *xdgdir;
-		asprintf(&xdgdir, "%s/.config", getenv("HOME"));
+		xdgdir = s_asprintf("%s/.config", getenv("HOME"));
 		if( mkdir(xdgdir, S_IRWXU) )
 			return 1;
 
-		free(xdgdir);
+		s_free(xdgdir);
 	}
 #endif
 
@@ -135,14 +132,14 @@ int sosc_config_read(const char *serial, sosc_config_t *config) {
 		break;
 	}
 
-	free(path);
+	s_free(path);
 
 	sec = cfg_getsec(cfg, "server");
 	sosc_port_itos(config->server.port, cfg_getint(sec, "port"));
 
 	sec = cfg_getsec(cfg, "application");
 	prepend_slash_if_necessary(&config->app.osc_prefix, cfg_getstr(sec, "osc_prefix"));
-	config->app.host = strdup(cfg_getstr(sec, "host"));
+	config->app.host = s_strdup(cfg_getstr(sec, "host"));
 	sosc_port_itos(config->app.port, cfg_getint(sec, "port"));
 
 	sec = cfg_getsec(cfg, "device");
@@ -166,11 +163,11 @@ int sosc_config_write(const char *serial, sosc_state_t *state) {
 
 	path = path_for_serial(serial);
 	if( !(f = fopen(path, "w")) ) {
-		free(path);
+		s_free(path);
 		return 1;
 	}
 
-	free(path);
+	s_free(path);
 
 	sec = cfg_getsec(cfg, "server");
 	cfg_setint(sec, "port", lo_server_get_port(state->server));

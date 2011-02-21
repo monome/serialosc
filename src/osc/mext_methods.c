@@ -89,7 +89,7 @@ OSC_HANDLER_FUNC(led_intensity_handler) {
 }
 
 #define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
-                          free(cmd_buf), cmd_buf = NULL )
+                          s_free(cmd_buf), cmd_buf = NULL )
 
 void osc_register_methods(sosc_state_t *state) {
 	char *prefix, *cmd_buf;

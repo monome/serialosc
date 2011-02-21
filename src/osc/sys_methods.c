@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define _GNU_SOURCE /* for asprintf */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -213,13 +212,11 @@ OSC_HANDLER_FUNC(sys_prefix_handler) {
 	sosc_state_t *state = user_data;
 	char *new, *old = state->config.app.osc_prefix;
 
-	new = &argv[0]->s;
-
 	if( argv[0]->s != '/' )
 		/* prepend a slash */
-		asprintf(&new, "/%s", &argv[0]->s);
+		new = s_asprintf("/%s", &argv[0]->s);
 	else
-		new = strdup(&argv[0]->s);
+		new = s_strdup(&argv[0]->s);
 
 	osc_unregister_methods(state);
 	state->config.app.osc_prefix = new;
@@ -228,7 +225,7 @@ OSC_HANDLER_FUNC(sys_prefix_handler) {
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE,
 	             "/sys/prefix", "s", new);
 
-	free(old);
+	s_free(old);
 
 	return 0;
 }

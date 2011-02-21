@@ -14,7 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define _GNU_SOURCE /* for asprintf */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,7 +54,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 	cmd = osc_path("grid/key", state->config.app.osc_prefix);
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
 	             e->x, e->y, e->event_type);
-	free(cmd);
+	s_free(cmd);
 }
 
 static void mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
@@ -136,6 +135,6 @@ void server_run(monome_t *monome) {
 err_lo_addr:
 	lo_server_free(state.server);
 err_server_new:
-	free(state.config.app.osc_prefix);
-	free(state.config.app.host);
+	s_free(state.config.app.osc_prefix);
+	s_free(state.config.app.host);
 }

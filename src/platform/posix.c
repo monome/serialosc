@@ -1,10 +1,10 @@
 /**
- * Copyright (c) 2010 William Light <wrl@illest.net>
- * 
+ * Copyright (c) 2011 William Light <wrl@illest.net>
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -14,22 +14,38 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define _GNU_SOURCE /* for asprintf */
 #include <stdlib.h>
-#include <unistd.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "osc.h"
+#include "serialosc.h"
 
-char *osc_path(const char *path, const char *prefix) {
+char *s_asprintf(const char *fmt, ...) {
+	va_list args;
 	char *buf;
 
-	if( !(buf = s_asprintf("%s/%s", prefix, path)) ) {
-		fprintf(stderr, "aieee, could not allocate memory in "
-				"osc_path(), bailing out!\n");
+	va_start(args, fmt);
 
-		/* in a child process, use _exit() instead of exit() */
-		_exit(EXIT_FAILURE);
-	}
+	if( vasprintf(&buf, fmt, args) < 0 )
+		buf = NULL;
 
+	va_end(args);
 	return buf;
+}
+
+void *s_malloc(size_t size) {
+	return malloc(size);
+}
+
+void *s_calloc(size_t nmemb, size_t size) {
+	return calloc(nmemb, size);
+}
+
+void *s_strdup(const char *s) {
+	return strdup(s);
+}
+
+void s_free(void *ptr) {
+	free(ptr);
 }

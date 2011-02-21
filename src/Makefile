@@ -1,6 +1,10 @@
 CFLAGS += -I./private $(LO_CFLAGS) $(LIBMONOME_CFLAGS) $(LIBCONFUSE_CFLAGS)
 LDFLAGS += $(LO_LDFLAGS) $(LIBMONOME_LDFLAGS) $(LIBCONFUSE_LDFLAGS)
 
+PLATFORM_linux_OBJS   = platform/posix.o
+PLATFORM_darwin_OBJS  = platform/posix.o
+PLATFORM_windows_OBJS = platform/windows.o
+
 SERIALOSC_OBJS  = serialosc.o
 SERIALOSC_OBJS += util.o
 SERIALOSC_OBJS += server.o
@@ -9,7 +13,8 @@ SERIALOSC_OBJS += osc/util.o
 SERIALOSC_OBJS += osc/mext_methods.o
 SERIALOSC_OBJS += osc/sys_methods.o
 
-SERIALOSC_OBJS += detector/$(PLATFORM).o
+SERIALOSC_OBJS += $(PLATFORM_$(PLATFORM)_OBJS)
+SERIALOSC_OBJS += detector/$(DETECTOR).o
 SERIALOSC_OBJS += event_loop/$(EVLOOP).o
 
 all: serialosc
