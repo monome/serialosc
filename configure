@@ -470,6 +470,7 @@ case $PLATFORM in
 		LIBSUFFIX=dll;
 		PLATFORM=windows;
 		DETECTOR=windows;
+		EVLOOP=waitformultipleobjects;
 
 		CFLAGS="$CFLAGS -DWIN32";
 
@@ -586,7 +587,9 @@ conf_libconfuse() {
 	fi
 }
 
-conf_poll;
+if [ $PLATFORM != "windows" ]; then
+	conf_poll;
+fi
 
 echo ""
 

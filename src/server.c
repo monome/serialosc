@@ -18,7 +18,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#ifndef WIN32
 #include <arpa/inet.h>
+#else
+#include <Winsock2.h>
+#endif
 
 #include <lo/lo.h>
 #include <dns_sd.h>

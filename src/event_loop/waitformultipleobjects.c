@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010 William Light <wrl@illest.net>
+ * Copyright (c) 2011 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,26 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifdef __STRICT_ANSI__
-#undef __STRICT_ANSI__
-#endif
+#include "serialosc.h"
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-
-#include "osc.h"
-
-char *osc_path(const char *path, const char *prefix) {
-	char *buf;
-
-	if( !(buf = s_asprintf("%s/%s", prefix, path)) ) {
-		fprintf(stderr, "aieee, could not allocate memory in "
-				"osc_path(), bailing out!\n");
-
-		/* in a child process, use _exit() instead of exit() */
-		_exit(EXIT_FAILURE);
-	}
-
-	return buf;
+int event_loop(const sosc_state_t *state) {
+	return 0;
 }

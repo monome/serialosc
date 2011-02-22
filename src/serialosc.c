@@ -18,6 +18,7 @@
 #define _XOPEN_SOURCE 600
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <monome.h>
 
 #include "serialosc.h"
@@ -40,7 +41,10 @@ int main(int argc, char **argv) {
 	if( !(device = monome_open(argv[1])) )
 		return EXIT_FAILURE;
 
+#ifndef WIN32
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
+#endif
+
 	server_run(device);
 	monome_close(device);
 

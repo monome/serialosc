@@ -31,7 +31,7 @@ clean:
 
 serialosc: $(SERIALOSC_OBJS)
 	echo "  LD      src/serialosc"
-	$(LD) $(LDFLAGS) -o $@ $(SERIALOSC_OBJS)
+	$(LD) -o $@ $(SERIALOSC_OBJS) $(LDFLAGS) 
 
 .c.o:
 	echo "  CC      src/$@"

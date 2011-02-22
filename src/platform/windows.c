@@ -19,6 +19,7 @@
 #endif
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -32,7 +33,6 @@
 static int mk_monome_dir(char *cdir) {
 	int ret = 0;
 	char *last_slash = strrchr(cdir, '\\');
-	struct _stat buf[1];
 	*last_slash = '\0';
 
 	if( _mkdir(cdir) && errno != EEXIST )
@@ -43,7 +43,7 @@ static int mk_monome_dir(char *cdir) {
 }
 
 char *sosc_get_config_directory() {
-	char *appdata, *dir;
+	char *appdata;
 
 	if( !(appdata = getenv("LOCALAPPDATA")) )
 		appdata = getenv("APPDATA");
@@ -52,7 +52,7 @@ char *sosc_get_config_directory() {
 }
 
 int sosc_config_create_directory() {
-	char *cdir, *xdgdir;
+	char *cdir;
 	struct _stat buf[1];
 
 	cdir = sosc_get_config_directory();
@@ -62,7 +62,7 @@ int sosc_config_create_directory() {
 	if( mk_monome_dir(cdir) )
 		goto err_mkdir;
 
-	if( _mkdir(cdir, S_IRWXU) )
+	if( _mkdir(cdir) )
 		goto err_mkdir;
 
 	s_free(cdir);
