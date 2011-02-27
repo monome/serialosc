@@ -30,7 +30,6 @@ OSC_HANDLER_FUNC(led_set_handler) {
 
 OSC_HANDLER_FUNC(led_all_handler) {
 	monome_t *monome = user_data;
-
 	return monome_led_all(monome, !!argv[0]->i);
 }
 
