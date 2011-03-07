@@ -88,6 +88,63 @@ OSC_HANDLER_FUNC(led_intensity_handler) {
 	return monome_led_intensity(monome, argv[0]->i);
 }
 
+OSC_HANDLER_FUNC(led_level_set_handler) {
+	monome_t *monome = user_data;
+	return monome_led_level_set(monome, argv[0]->i, argv[1]->i, argv[2]->i);
+}
+
+OSC_HANDLER_FUNC(led_level_all_handler) {
+	monome_t *monome = user_data;
+	return monome_led_level_all(monome, argv[0]->i);
+}
+
+OSC_HANDLER_FUNC(led_level_map_handler) {
+	monome_t *monome = user_data;
+	uint8_t buf[64];
+	int i;
+
+	for( i = 0; i < 64; i++ )
+		buf[i] = argv[i + (argc - 64)]->i;
+
+	return monome_led_level_map(monome, argv[0]->i, argv[1]->i, buf);
+}
+
+OSC_HANDLER_FUNC(led_level_col_handler) {
+	monome_t *monome = user_data;
+	uint8_t buf[32];
+	int i;
+
+	if( argc < 3 || argc > 34 )
+		return 1;
+
+	for( i = 0; i < argc; i++ )
+		if( types[i] != 'i' ) /* only integers are invited to this party */
+			return 1;
+
+	for( i = 0; i < (argc - 2); i++ )
+		buf[i] = argv[i + 2]->i;
+
+	return monome_led_level_col(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
+}
+
+OSC_HANDLER_FUNC(led_level_row_handler) {
+	monome_t *monome = user_data;
+	uint8_t buf[32];
+	int i;
+
+	if( argc < 3 || argc > 34 )
+		return 1;
+
+	for( i = 0; i < argc; i++ )
+		if( types[i] != 'i' )
+			return 1;
+
+	for( i = 0; i < (argc - 2); i++ )
+		buf[i] = argv[i + 2]->i;
+
+	return monome_led_level_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
+}
+
 #define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
                           s_free(cmd_buf), cmd_buf = NULL )
 
@@ -121,6 +178,30 @@ void osc_register_methods(sosc_state_t *state) {
 	METHOD("grid/led/intensity")
 		REGISTER("i", led_intensity_handler);
 
+	METHOD("grid/led/level/set")
+		REGISTER("iii", led_level_set_handler);
+
+	METHOD("grid/led/level/all")
+		REGISTER("i", led_level_all_handler);
+
+	METHOD("grid/led/level/map")
+		REGISTER("ii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii",
+		         led_level_map_handler);
+
+	METHOD("grid/led/level/col")
+		REGISTER(NULL, led_level_col_handler);
+
+	METHOD("grid/led/level/row")
+		REGISTER(NULL, led_level_row_handler);
+
 #undef REGISTER
 }
 
@@ -153,6 +234,29 @@ void osc_unregister_methods(sosc_state_t *state) {
 
 	METHOD("grid/led/intensity")
 		UNREGISTER("i");
+
+	METHOD("grid/led/level/set")
+		UNREGISTER("iii");
+
+	METHOD("grid/led/level/all")
+		UNREGISTER("i");
+
+	METHOD("grid/led/level/map")
+		UNREGISTER("ii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii");
+
+	METHOD("grid/led/level/col")
+		UNREGISTER(NULL);
+
+	METHOD("grid/led/level/row")
+		UNREGISTER(NULL);
 
 #undef UNREGISTER
 }
