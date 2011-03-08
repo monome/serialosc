@@ -15,6 +15,7 @@
  */
 
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include "platform.h"
 
