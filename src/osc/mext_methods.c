@@ -60,7 +60,6 @@ OSC_HANDLER_FUNC(led_col_handler) {
 	for( i = 0; i < (argc - 2); i++ )
 		buf[i] = argv[i + 2]->i;
 
-	/* FIXME: order of arguments for libmonome functions should match OSC */
 	return monome_led_col(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
@@ -79,8 +78,7 @@ OSC_HANDLER_FUNC(led_row_handler) {
 	for( i = 0; i < (argc - 2); i++ )
 		buf[i] = argv[i + 2]->i;
 
-	/* FIXME: order of arguments for libmonome functions should match OSC */
-	return monome_led_row(monome, argv[1]->i, argv[0]->i, argc - 2, buf);
+	return monome_led_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
 OSC_HANDLER_FUNC(led_intensity_handler) {
