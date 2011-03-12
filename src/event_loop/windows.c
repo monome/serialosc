@@ -32,31 +32,48 @@ static DWORD WINAPI lo_thread(LPVOID param) {
 }
 
 int event_loop(const sosc_state_t *state) {
-	HANDLE srl_res, lo_thd_res;
+	OVERLAPPED ov = {0, 0, {{0, 0}}};
+	HANDLE hres, lo_thd_res;
 	DWORD evt_mask;
 
-	srl_res = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
+	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
 	lo_thd_res = CreateThread(NULL, 0, lo_thread, (void *) state, 0, NULL);
 
-	do {
-		SetCommMask(srl_res, EV_RXCHAR | EV_RLSD);
+	if( !(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) ) {
+		fprintf(stderr, "serialosc: event_loop: can't allocate event (%ld)\n",
+		        GetLastError());
+		return 1;
+	}
 
-		if( !WaitCommEvent(srl_res, &evt_mask, NULL) ) {
-			if( GetLastError() == ERROR_OPERATION_ABORTED )
-				/* monome was unplugged */
+	do {
+		SetCommMask(hres, EV_RXCHAR);
+
+		if( !WaitCommEvent(hres, &evt_mask, &ov) )
+			switch( GetLastError() ) {
+			case ERROR_IO_PENDING:
 				break;
 
-			printf("event_loop() error: %d\n", GetLastError());
-			break;
-		}
+			case ERROR_ACCESS_DENIED:
+				/* evidently we get this when the monome is unplugged? */
+				return 1;
 
-		switch( evt_mask ) {
-		case EV_RXCHAR:
+			default:
+				printf("event_loop() error: %d\n", GetLastError());
+				return 1;
+			}
+
+		switch( WaitForSingleObject(ov.hEvent, INFINITE) ) {
+		case WAIT_OBJECT_0:
 			monome_event_handle_next(state->monome);
 			break;
 
-		default:
+		case WAIT_TIMEOUT:
 			break;
+
+		case WAIT_ABANDONED_0:
+		case WAIT_FAILED:
+			printf("event_loop(): wait failed: %ld\n", GetLastError());
+			return 1;
 		}
 	} while ( 1 );
 
