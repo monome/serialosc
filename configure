@@ -470,7 +470,7 @@ case $PLATFORM in
 		LIBSUFFIX=dll;
 		PLATFORM=windows;
 		DETECTOR=windows;
-		EVLOOP=waitformultipleobjects;
+		EVLOOP=windows;
 
 		CFLAGS="$CFLAGS -DWIN32 -fms-extensions";
 
