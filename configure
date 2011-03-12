@@ -472,7 +472,7 @@ case $PLATFORM in
 		DETECTOR=windows;
 		EVLOOP=waitformultipleobjects;
 
-		CFLAGS="$CFLAGS -DWIN32";
+		CFLAGS="$CFLAGS -DWIN32 -fms-extensions";
 
 		LO_LDFLAGS="$LO_LDFLAGS -lws2_32";
 		LIBCONFUSE_LDFLAGS="$LIBCONFUSE_LDFLAGS -lintl";
