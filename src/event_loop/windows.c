@@ -64,7 +64,7 @@ int event_loop(const sosc_state_t *state) {
 
 		switch( WaitForSingleObject(ov.hEvent, INFINITE) ) {
 		case WAIT_OBJECT_0:
-			monome_event_handle_next(state->monome);
+			while( monome_event_handle_next(state->monome) );
 			break;
 
 		case WAIT_TIMEOUT:
