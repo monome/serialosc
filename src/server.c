@@ -58,7 +58,7 @@ static void handle_press(const monome_event_t *e, void *data) {
 
 	cmd = osc_path("grid/key", state->config.app.osc_prefix);
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
-	             e->x, e->y, e->event_type);
+	             e->grid.x, e->grid.y, e->event_type);
 	s_free(cmd);
 }
 
