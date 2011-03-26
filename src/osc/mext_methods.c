@@ -142,6 +142,35 @@ OSC_HANDLER_FUNC(led_level_row_handler) {
 	return monome_led_level_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
+OSC_HANDLER_FUNC(led_ring_set_handler) {
+	monome_t *monome = user_data;
+
+	return monome_led_ring_set(monome, argv[0]->i, argv[1]->i, argv[2]->i);
+}
+
+OSC_HANDLER_FUNC(led_ring_all_handler) {
+	monome_t *monome = user_data;
+
+	return monome_led_ring_all(monome, argv[0]->i, argv[1]->i);
+}
+
+OSC_HANDLER_FUNC(led_ring_map_handler) {
+	monome_t *monome = user_data;
+	uint8_t buf[64];
+	int i;
+
+	for( i = 0; i < 64; i++ )
+		buf[i] = argv[i + (argc - 64)]->i;
+
+	return monome_led_ring_map(monome, argv[0]->i, buf);
+}
+
+OSC_HANDLER_FUNC(led_ring_range_handler) {
+	monome_t *monome = user_data;
+
+	return monome_led_ring_range(monome, argv[0]->i, argv[1]->i, argv[2]->i, argv[3]->i);
+}
+
 #define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
                           s_free(cmd_buf), cmd_buf = NULL )
 
@@ -199,6 +228,27 @@ void osc_register_methods(sosc_state_t *state) {
 	METHOD("grid/led/level/row")
 		REGISTER(NULL, led_level_row_handler);
 
+	METHOD("ring/set")
+		REGISTER("iii", led_ring_set_handler);
+
+	METHOD("ring/all")
+		REGISTER("ii", led_ring_all_handler);
+
+	METHOD("ring/map")
+		REGISTER("i"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii"
+		         "iiiiiiii",
+		         led_ring_map_handler);
+
+	METHOD("ring/range")
+		REGISTER("iiii", led_ring_range_handler);
+
 #undef REGISTER
 }
 
@@ -254,6 +304,26 @@ void osc_unregister_methods(sosc_state_t *state) {
 
 	METHOD("grid/led/level/row")
 		UNREGISTER(NULL);
+
+	METHOD("ring/set")
+		UNREGISTER("iii");
+
+	METHOD("ring/all")
+		UNREGISTER("ii");
+
+	METHOD("ring/map")
+		UNREGISTER("i"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii"
+		           "iiiiiiii");
+
+	METHOD("ring/range")
+		UNREGISTER("iiii");
 
 #undef UNREGISTER
 }
