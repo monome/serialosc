@@ -58,7 +58,27 @@ static void handle_press(const monome_event_t *e, void *data) {
 
 	cmd = osc_path("grid/key", state->config.app.osc_prefix);
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iii",
-	             e->grid.x, e->grid.y, e->event_type);
+	             e->grid.x, e->grid.y, e->event_type == MONOME_BUTTON_DOWN);
+	s_free(cmd);
+}
+
+static void handle_enc_delta(const monome_event_t *e, void *data) {
+	sosc_state_t *state = data;
+	char *cmd;
+
+	cmd = osc_path("enc/delta", state->config.app.osc_prefix);
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "ii",
+	             e->encoder.number, e->encoder.delta);
+	s_free(cmd);
+}
+
+static void handle_enc_key(const monome_event_t *e, void *data) {
+	sosc_state_t *state = data;
+	char *cmd;
+
+	cmd = osc_path("enc/key", state->config.app.osc_prefix);
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "ii",
+	             e->encoder.number, e->event_type == MONOME_ENCODER_KEY_DOWN);
 	s_free(cmd);
 }
 
@@ -108,10 +128,13 @@ void server_run(monome_t *monome) {
 		/* callBack       */  mdns_callback,
 		/* context        */  NULL);
 
-	monome_register_handler(state.monome, MONOME_BUTTON_DOWN,
-	                        handle_press, &state);
-	monome_register_handler(state.monome, MONOME_BUTTON_UP,
-	                        handle_press, &state);
+#define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
+	HANDLE(MONOME_BUTTON_DOWN, handle_press);
+	HANDLE(MONOME_BUTTON_UP, handle_press);
+	HANDLE(MONOME_ENCODER_DELTA, handle_enc_delta);
+	HANDLE(MONOME_ENCODER_KEY_DOWN, handle_enc_key);
+	HANDLE(MONOME_ENCODER_KEY_UP, handle_enc_key);
+#undef HANDLE
 
 	monome_set_rotation(state.monome, state.config.dev.rotation);
 	monome_led_all(state.monome, 0);
