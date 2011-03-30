@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <assert.h>
 #include <stdio.h>
 
 #include <windows.h>
@@ -27,10 +28,12 @@
 
 typedef struct {
 	const char *exec_path;
+	const char *quoted_exec_path;
 } detector_state_t;
 
-static int spawn_server(const char *exec_path, const char *devnode) {
-	if( _spawnlp(_P_NOWAIT, exec_path, exec_path, devnode, NULL) < 0 ) {
+static int spawn_server(detector_state_t *state, const char *devnode) {
+	if( _spawnlp(_P_NOWAIT, state->exec_path, state->quoted_exec_path,
+	             devnode, NULL) < 0 ) {
 		perror("dang");
 		return 1;
 	}
@@ -100,7 +103,7 @@ int scan_connected_devices(detector_state_t *state) {
 			goto next;
 		}
 
-		spawn_server(state->exec_path, (char *) port_name);
+		spawn_server(state, (char *) port_name);
 
 next:
 		RegCloseKey(subkey);
@@ -112,17 +115,23 @@ done:
 }
 
 int detector_run(const char *exec_path) {
-	MSG msg;
 	detector_state_t state = {
 		.exec_path = exec_path
 	};
+	MSG msg;
+
+	assert(exec_path);
+	if( !(state.quoted_exec_path = s_asprintf("\"%s\"", exec_path)) ) {
+		fprintf(stderr, "detector_run() error: couldn't allocate memory\n");
+		return 1;
+	}
 
 	scan_connected_devices(&state);
 
 	do {
 		if( GetMessage(&msg, NULL, 0, 0) < 0 ) {
 			printf("detector_run() error: %ld\n", GetLastError());
-			return 0;
+			return 1;
 		}
 
 		puts("message");
