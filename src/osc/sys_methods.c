@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include <lo/lo.h>
 #include <monome.h>
@@ -87,8 +86,6 @@ static int info_prop_handler_default(void *user_data, info_reply_func_t cb) {
 #define DECLARE_INFO_PROP(prop, typetag, ...)\
 	DECLARE_INFO_REPLY_FUNC(prop, typetag, __VA_ARGS__)\
 	DECLARE_INFO_HANDLERS(prop)
-
-#define SEND_INFO_PROP(state, to, prop) info_reply_##prop(to, state)
 
 DECLARE_INFO_PROP(id, "s", monome_get_serial(state->monome))
 DECLARE_INFO_PROP(size, "ii", monome_get_cols(state->monome),
