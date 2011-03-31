@@ -88,12 +88,15 @@ static int info_prop_handler_default(void *user_data, info_reply_func_t cb) {
 	DECLARE_INFO_REPLY_FUNC(prop, typetag, __VA_ARGS__)\
 	DECLARE_INFO_HANDLERS(prop)
 
+#define SEND_INFO_PROP(state, to, prop) info_reply_##prop(to, state)
+
 DECLARE_INFO_PROP(id, "s", monome_get_serial(state->monome))
 DECLARE_INFO_PROP(size, "ii", monome_get_cols(state->monome),
                   monome_get_rows(state->monome))
 DECLARE_INFO_PROP(host, "s", lo_address_get_hostname(state->outgoing))
 DECLARE_INFO_PROP(port, "i", atoi(lo_address_get_port(state->outgoing)))
 DECLARE_INFO_PROP(prefix, "s", state->config.app.osc_prefix)
+DECLARE_INFO_PROP(rotation, "i", monome_get_rotation(state->monome) * 90)
 
 static void info_reply_all(lo_address *to, sosc_state_t *state) {
 	info_reply_id(to, state);
@@ -101,6 +104,7 @@ static void info_reply_all(lo_address *to, sosc_state_t *state) {
 	info_reply_host(to, state);
 	info_reply_port(to, state);
 	info_reply_prefix(to, state);
+	info_reply_rotation(to, state);
 }
 
 OSC_HANDLER_FUNC(sys_info_handler) {
@@ -121,48 +125,61 @@ OSC_HANDLER_FUNC(sys_mode_handler) {
 }
 
 OSC_HANDLER_FUNC(sys_cable_legacy_handler) {
-	monome_t *monome = user_data;
+	sosc_state_t *state = user_data;
+	monome_rotate_t new, old;
+
+	old = monome_get_rotation(state->monome);
 
 	switch( argv[0]->s ) {
 	case 'L':
 	case 'l':
 	case '0':
-		monome_set_rotation(monome, MONOME_ROTATE_0);
-		return 0;
+		new = MONOME_ROTATE_0;
+		break;
 
 	case 'T':
 	case 't':
 	case '9':
-		monome_set_rotation(monome, MONOME_ROTATE_90);
-		return 0;
+		new = MONOME_ROTATE_90;
+		break;
 
 	case 'R':
 	case 'r':
 	case '1':
-		monome_set_rotation(monome, MONOME_ROTATE_180);
-		return 0;
+		new = MONOME_ROTATE_180;
+		break;
 
 	case 'B':
 	case 'b':
 	case '2':
-		monome_set_rotation(monome, MONOME_ROTATE_270);
-		return 0;
+		new = MONOME_ROTATE_270;
+		break;
 
 	default:
 		return 1;
 	}
+
+	if( old == new )
+		return 0;
+
+	monome_set_rotation(state->monome, new);
+	info_reply_rotation(state->outgoing, state);
+	return 0;
 }
 
 OSC_HANDLER_FUNC(sys_rotation_handler) {
-	monome_t *monome = user_data;
+	sosc_state_t *state = user_data;
+	monome_rotate_t new, old;
 
-	switch( argv[0]->i ) {
-	case 0:   monome_set_rotation(monome, MONOME_ROTATE_0);   return 0;
-	case 90:  monome_set_rotation(monome, MONOME_ROTATE_90);  return 0;
-	case 180: monome_set_rotation(monome, MONOME_ROTATE_180); return 0;
-	case 270: monome_set_rotation(monome, MONOME_ROTATE_270); return 0;
-	default:  return 1;
-	}
+	old = monome_get_rotation(state->monome);
+	new = argv[0]->i / 90;
+
+	if( old == new )
+		return 0;
+
+	monome_set_rotation(state->monome, new);
+	info_reply_rotation(state->outgoing, state);
+	return 0;
 }
 
 OSC_HANDLER_FUNC(sys_port_handler) {
@@ -177,12 +194,11 @@ OSC_HANDLER_FUNC(sys_port_handler) {
 		return 1;
 	}
 
-	lo_send_from(old, state->server, LO_TT_IMMEDIATE,
-	             "/sys/port", "i", argv[0]->i);
-	lo_send_from(new, state->server, LO_TT_IMMEDIATE,
-	             "/sys/port", "i", argv[0]->i);
-
 	state->outgoing = new;
+
+	info_reply_port(old, state);
+	info_reply_port(new, state);
+
 	lo_address_free(old);
 
 	return 0;
@@ -197,12 +213,11 @@ OSC_HANDLER_FUNC(sys_host_handler) {
 		return 1;
 	}
 
-	lo_send_from(old, state->server, LO_TT_IMMEDIATE,
-	             "/sys/host", "s", &argv[0]->s);
-	lo_send_from(new, state->server, LO_TT_IMMEDIATE,
-	             "/sys/host", "s", &argv[0]->s);
-
 	state->outgoing = new;
+
+	info_reply_host(old, state);
+	info_reply_host(new, state);
+
 	lo_address_free(old);
 
 	return 0;
@@ -222,8 +237,7 @@ OSC_HANDLER_FUNC(sys_prefix_handler) {
 	state->config.app.osc_prefix = new;
 	osc_register_methods(state);
 
-	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE,
-	             "/sys/prefix", "s", new);
+	info_reply_prefix(state->outgoing, state);
 
 	s_free(old);
 
@@ -248,6 +262,7 @@ void osc_register_sys_methods(sosc_state_t *state) {
 	REGISTER_INFO_PROP(host);
 	REGISTER_INFO_PROP(port);
 	REGISTER_INFO_PROP(prefix);
+	REGISTER_INFO_PROP(rotation);
 
 	METHOD("info") {
 		REGISTER("si", sys_info_handler, state);
@@ -259,10 +274,10 @@ void osc_register_sys_methods(sosc_state_t *state) {
 		REGISTER("i", sys_mode_handler, state->monome);
 
 	METHOD("cable")
-		REGISTER("s", sys_cable_legacy_handler, state->monome);
+		REGISTER("s", sys_cable_legacy_handler, state);
 
 	METHOD("rotation")
-		REGISTER("i", sys_rotation_handler, state->monome);
+		REGISTER("i", sys_rotation_handler, state);
 
 	METHOD("port")
 		REGISTER("i", sys_port_handler, state);
