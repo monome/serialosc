@@ -95,6 +95,7 @@ static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 
 void server_run(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
+	char *svc_name;
 
 	if( sosc_config_read(monome_get_serial(state.monome), &state.config) ) {
 		fprintf(
@@ -114,11 +115,22 @@ void server_run(monome_t *monome) {
 		goto err_lo_addr;
 	}
 
+	svc_name = s_asprintf(
+		"%s (%s)", monome_get_friendly_name(state.monome),
+		monome_get_serial(state.monome));
+
+	if( !svc_name ) {
+		fprintf(
+			stderr, "serialosc [%s]: couldn't allocate memory, aieee!\n",
+			monome_get_serial(state.monome));
+		goto err_svc_name;
+	}
+
 	DNSServiceRegister(
 		/* sdref          */  &state.ref,
 		/* interfaceIndex */  0,
 		/* flags          */  0,
-		/* name           */  monome_get_serial(state.monome),
+		/* name           */  svc_name,
 		/* regtype        */  "_monome-osc._udp",
 		/* domain         */  NULL,
 		/* host           */  NULL,
@@ -127,6 +139,8 @@ void server_run(monome_t *monome) {
 		/* txtRecord      */  NULL,
 		/* callBack       */  mdns_callback,
 		/* context        */  NULL);
+
+	free(svc_name);
 
 #define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
 	HANDLE(MONOME_BUTTON_DOWN, handle_press);
@@ -159,6 +173,7 @@ void server_run(monome_t *monome) {
 			monome_get_serial(state.monome));
 	}
 
+err_svc_name:
 	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
