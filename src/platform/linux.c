@@ -42,7 +42,7 @@ int sosc_config_create_directory() {
 		xdgdir = s_asprintf("%s/.config", getenv("HOME"));
 
 		/* well, I guess somebody's got to do it */
-		if( stat(cdir, buf) && mkdir(xdgdir, S_IRWXU) )
+		if( stat(xdgdir, buf) && mkdir(xdgdir, S_IRWXU) )
 			goto err_xdg;
 	}
 
