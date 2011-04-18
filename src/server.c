@@ -82,6 +82,16 @@ static void handle_enc_key(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
+static void send_connection_status(sosc_state_t *state, int status) {
+	char *cmd, *cmds[] = {
+		"/sys/disconnect",
+		"/sys/connect"
+	};
+
+	cmd = cmds[status & 1];
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "");
+}
+
 static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
                    DNSServiceErrorType errorCode, const char *name,
                    const char *regtype, const char *domain, void *context) {
@@ -160,7 +170,9 @@ void server_run(monome_t *monome) {
 	printf("serialosc [%s]: connected, server running on port %d\n",
 	       monome_get_serial(state.monome), lo_server_get_port(state.server));
 
+	send_connection_status(&state, 1);
 	event_loop(&state);
+	send_connection_status(&state, 0);
 
 	printf("serialosc [%s]: disconnected, exiting\n",
 	       monome_get_serial(state.monome));
