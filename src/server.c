@@ -82,6 +82,16 @@ static void handle_enc_key(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
+static void handle_tilt(const monome_event_t *e, void *data) {
+	sosc_state_t *state = data;
+	char *cmd;
+
+	cmd = osc_path("tilt", state->config.app.osc_prefix);
+	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "iiii",
+	             e->tilt.sensor, e->tilt.x, e->tilt.y, e->tilt.z);
+	s_free(cmd);
+}
+
 static void send_connection_status(sosc_state_t *state, int status) {
 	char *cmd, *cmds[] = {
 		"/sys/disconnect",
@@ -158,6 +168,7 @@ void server_run(monome_t *monome) {
 	HANDLE(MONOME_ENCODER_DELTA, handle_enc_delta);
 	HANDLE(MONOME_ENCODER_KEY_DOWN, handle_enc_key);
 	HANDLE(MONOME_ENCODER_KEY_UP, handle_enc_key);
+	HANDLE(MONOME_TILT, handle_tilt);
 #undef HANDLE
 
 	monome_set_rotation(state.monome, state.config.dev.rotation);

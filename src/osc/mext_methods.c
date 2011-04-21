@@ -171,6 +171,15 @@ OSC_HANDLER_FUNC(led_ring_range_handler) {
 	return monome_led_ring_range(monome, argv[0]->i, argv[1]->i, argv[2]->i, argv[3]->i);
 }
 
+OSC_HANDLER_FUNC(tilt_set_handler) {
+	monome_t *monome = user_data;
+
+	if( argv[1]->i )
+		return monome_tilt_enable(monome, argv[0]->i);
+	else
+		return monome_tilt_disable(monome, argv[0]->i);
+}
+
 #define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
                           s_free(cmd_buf), cmd_buf = NULL )
 
@@ -249,16 +258,17 @@ void osc_register_methods(sosc_state_t *state) {
 	METHOD("ring/range")
 		REGISTER("iiii", led_ring_range_handler);
 
+	METHOD("tilt/set")
+		REGISTER("ii", tilt_set_handler);
+
 #undef REGISTER
 }
 
 void osc_unregister_methods(sosc_state_t *state) {
 	char *prefix, *cmd_buf;
-	monome_t *monome;
 	lo_server srv;
 
 	prefix = state->config.app.osc_prefix;
-	monome = state->monome;
 	srv = state->server;
 
 #define UNREGISTER(typetags) \
@@ -324,6 +334,9 @@ void osc_unregister_methods(sosc_state_t *state) {
 
 	METHOD("ring/range")
 		UNREGISTER("iiii");
+
+	METHOD("tilt/set")
+		UNREGISTER("ii");
 
 #undef UNREGISTER
 }
