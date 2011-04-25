@@ -25,11 +25,40 @@
 
 
 #define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
+#define SERVICE_NAME "serialosc"
 
 typedef struct {
-	const char *exec_path;
+	SERVICE_STATUS svc_status;
+	SERVICE_STATUS_HANDLE hstatus;
+
+	char *exec_path;
 	const char *quoted_exec_path;
 } detector_state_t;
+
+detector_state_t state = {
+	.svc_status = {
+		.dwServiceType = SERVICE_WIN32,
+		.dwCurrentState = SERVICE_START_PENDING,
+		.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN,
+		.dwWin32ExitCode = 0,
+		.dwServiceSpecificExitCode = 0,
+		.dwCheckPoint = 0,
+		.dwWaitHint = 0
+	}
+};
+
+void debug(char *fmt, ...) {
+	va_list ap;
+	FILE *log = fopen("C:/serialosc.txt", "a+");
+	if( !log )
+		return;
+
+	va_start(ap, fmt);
+	vfprintf(log, fmt, ap);
+	va_end(ap);
+
+	fclose(log);
+}
 
 static int spawn_server(detector_state_t *state, const char *devnode) {
 	if( _spawnlp(_P_NOWAIT, state->exec_path, state->quoted_exec_path,
@@ -114,28 +143,96 @@ done:
 	return 0;
 }
 
-int detector_run(const char *exec_path) {
-	detector_state_t state = {
-		.exec_path = exec_path
-	};
-	MSG msg;
+char *get_service_binpath() {
+	SC_HANDLE manager, service;
+	LPQUERY_SERVICE_CONFIG config;
+	DWORD config_size;
+	char *bin_path;
 
-	assert(exec_path);
-	if( !(state.quoted_exec_path = s_asprintf("\"%s\"", exec_path)) ) {
+	if( !(manager = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE)) )
+		goto err_manager;
+
+	if( !(service = OpenService(manager, SERVICE_NAME, SERVICE_QUERY_CONFIG)) )
+		goto err_service;
+
+	QueryServiceConfig(service, NULL, 0, &config_size);
+
+	if( !(config = s_malloc(config_size)) )
+		goto err_malloc;
+
+	if( !QueryServiceConfig(service, config, config_size, &config_size) )
+		goto err_query;
+
+	bin_path = s_strdup(config->lpBinaryPathName);
+	s_free(config);
+
+	CloseServiceHandle(service);
+	CloseServiceHandle(manager);
+	return bin_path;
+
+err_query:
+	s_free(config);
+err_malloc:
+	CloseServiceHandle(service);
+err_service:
+	CloseServiceHandle(manager);
+err_manager:
+	return NULL;
+}
+
+void WINAPI control_handler(DWORD request) {
+	switch( request ) {
+	case SERVICE_CONTROL_SHUTDOWN:
+	case SERVICE_CONTROL_STOP:
+		state.svc_status.dwWin32ExitCode = 0;
+		state.svc_status.dwCurrentState  = SERVICE_STOPPED;
+		SetServiceStatus(state.hstatus, &state.svc_status);
+		return;
+
+	default:
+		break;
+	}
+
+	SetServiceStatus(state.hstatus, &state.svc_status);
+	return;
+}
+
+void WINAPI service_main(DWORD argc, LPTSTR *argv) {
+	state.hstatus = RegisterServiceCtrlHandler(SERVICE_NAME, control_handler);
+	if( !state.hstatus )
+		return;
+
+	state.svc_status.dwCurrentState = SERVICE_RUNNING;
+	SetServiceStatus(state.hstatus, &state.svc_status);
+
+	if( !(state.exec_path = get_service_binpath()) )
+		goto err;
+
+	if( !(state.quoted_exec_path = s_asprintf("\"%s\"", state.exec_path)) ) {
 		fprintf(stderr, "detector_run() error: couldn't allocate memory\n");
-		return 1;
+		goto err_asprintf;
 	}
 
 	scan_connected_devices(&state);
+	return;
 
-	do {
-		if( GetMessage(&msg, NULL, 0, 0) < 0 ) {
-			printf("detector_run() error: %ld\n", GetLastError());
-			return 1;
-		}
+err_asprintf:
+	s_free(state.exec_path);
+err:
+	state.svc_status.dwCurrentState = SERVICE_STOPPED;
+	state.svc_status.dwWin32ExitCode = 1;
+	SetServiceStatus(state.hstatus, &state.svc_status);
+	return;
+}
 
-		puts("message");
-	} while( 1 );
+int detector_run(const char *exec_path) {
+	SERVICE_TABLE_ENTRY services[] = {
+		{SERVICE_NAME, service_main},
+		{NULL, NULL}
+	};
+
+	/* your APIs suck, fuck you. */
+	StartServiceCtrlDispatcher(services);
 
 	return 0;
 }
