@@ -17,9 +17,12 @@
 #include <assert.h>
 #include <stdio.h>
 
+#define WINVER 0x501
+
 #include <windows.h>
 #include <process.h>
 #include <Winreg.h>
+#include <Dbt.h>
 
 #include "serialosc.h"
 
@@ -47,21 +50,8 @@ detector_state_t state = {
 	}
 };
 
-void debug(char *fmt, ...) {
-	va_list ap;
-	FILE *log = fopen("C:/serialosc.txt", "a+");
-	if( !log )
-		return;
-
-	va_start(ap, fmt);
-	vfprintf(log, fmt, ap);
-	va_end(ap);
-
-	fclose(log);
-}
-
-static int spawn_server(detector_state_t *state, const char *devnode) {
-	if( _spawnlp(_P_NOWAIT, state->exec_path, state->quoted_exec_path,
+static int spawn_server(const char *devnode) {
+	if( _spawnlp(_P_NOWAIT, state.exec_path, state.quoted_exec_path,
 	             devnode, NULL) < 0 ) {
 		perror("dang");
 		return 1;
@@ -70,7 +60,7 @@ static int spawn_server(detector_state_t *state, const char *devnode) {
 	return 0;
 }
 
-int scan_connected_devices(detector_state_t *state) {
+int scan_connected_devices() {
 	HKEY key, subkey;
 	char subkey_name[MAX_PATH], *subkey_path, *serial;
 	unsigned char port_name[64];
@@ -115,6 +105,7 @@ int scan_connected_devices(detector_state_t *state) {
 			break;
 
 		default:
+			free(subkey_path);
 			continue;
 		}
 
@@ -132,7 +123,7 @@ int scan_connected_devices(detector_state_t *state) {
 			goto next;
 		}
 
-		spawn_server(state, (char *) port_name);
+		spawn_server((char *) port_name);
 
 next:
 		RegCloseKey(subkey);
@@ -180,7 +171,56 @@ err_manager:
 	return NULL;
 }
 
+char *ftdishit_to_port(char *bullshit) {
+	char *subkey_path, *port, port_name[64];
+	DWORD plen, ptype;
+	HKEY subkey;
+
+	if( !(bullshit = strchr(bullshit, '#')) )
+		return NULL;
+
+	if( !(port = strchr(++bullshit, '#')) )
+		return NULL;
+
+	*port = '\0';
+
+	subkey_path = s_asprintf(FTDI_REG_PATH "\\%s\\0000\\Device Parameters",
+	                         bullshit);
+
+	switch( RegOpenKeyEx(
+	        HKEY_LOCAL_MACHINE, subkey_path,
+	        0, KEY_READ, &subkey) ) {
+	case ERROR_SUCCESS:
+		break;
+
+	default:
+		free(subkey_path);
+		return NULL;
+	}
+
+	free(subkey_path);
+
+	plen = sizeof(port_name) / sizeof(char);
+	ptype = REG_SZ;
+	switch( RegQueryValueEx(subkey, "PortName", 0, &ptype,
+	                        (unsigned char *) port_name, &plen) ) {
+	case ERROR_SUCCESS:
+		port_name[plen] = '\0';
+		break;
+
+	default:
+		RegCloseKey(subkey);
+		return NULL;
+	}
+
+	RegCloseKey(subkey);
+	return s_strdup(port_name);
+}
+
 DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
+	DEV_BROADCAST_DEVICEINTERFACE *dev;
+	char devname[256], *port;
+
 	switch( ctrl ) {
 	case SERVICE_CONTROL_SHUTDOWN:
 	case SERVICE_CONTROL_STOP:
@@ -193,6 +233,23 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
 		SetServiceStatus(state.hstatus, &state.svc_status);
 		return NO_ERROR;
 
+	case SERVICE_CONTROL_DEVICEEVENT:
+		switch( type ) {
+		case DBT_DEVICEARRIVAL:
+			dev = data;
+			wcstombs(devname, (wchar_t *) dev->dbcc_name, sizeof(devname));
+			port = ftdishit_to_port(devname);
+
+			spawn_server(port);
+
+			s_free(port);
+			break;
+
+		default:
+			break;
+		}
+		return NO_ERROR;
+
 	default:
 		break;
 	}
@@ -201,6 +258,10 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
 }
 
 void WINAPI service_main(DWORD argc, LPTSTR *argv) {
+	DEV_BROADCAST_DEVICEINTERFACE filter;
+	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
+		{0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73}};
+
 	state.hstatus = RegisterServiceCtrlHandlerEx(
 		SERVICE_NAME, control_handler, NULL);
 
@@ -219,8 +280,20 @@ void WINAPI service_main(DWORD argc, LPTSTR *argv) {
 	}
 
 	scan_connected_devices(&state);
+
+	filter.dbcc_size = sizeof(filter);
+	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+	filter.dbcc_reserved = 0;
+	filter.dbcc_classguid = vcp_guid;
+	filter.dbcc_name[0] = '\0';
+
+	if( !RegisterDeviceNotification((HANDLE) state.hstatus, &filter,
+									DEVICE_NOTIFY_SERVICE_HANDLE))
+		goto err_rdnotification;
+
 	return;
 
+err_rdnotification:
 err_asprintf:
 	s_free(state.exec_path);
 err:
@@ -238,6 +311,5 @@ int detector_run(const char *exec_path) {
 
 	/* your APIs suck, fuck you. */
 	StartServiceCtrlDispatcher(services);
-
 	return 0;
 }
