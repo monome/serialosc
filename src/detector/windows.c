@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <stdio.h>
 
+/* for RegisterDeviceNotification */
 #define WINVER 0x501
 
 #include <windows.h>
@@ -31,6 +32,7 @@
 #define SERVICE_NAME "serialosc"
 
 typedef struct {
+	HANDLE reaper_job;
 	SERVICE_STATUS svc_status;
 	SERVICE_STATUS_HANDLE hstatus;
 
@@ -51,11 +53,17 @@ detector_state_t state = {
 };
 
 static int spawn_server(const char *devnode) {
-	if( _spawnlp(_P_NOWAIT, state.exec_path, state.quoted_exec_path,
-	             devnode, NULL) < 0 ) {
+	intptr_t proc;
+
+	proc = _spawnlp(_P_NOWAIT, state.exec_path, state.quoted_exec_path,
+                    devnode, NULL);
+
+	if( proc < 0 ) {
 		perror("dang");
 		return 1;
 	}
+
+	AssignProcessToJobObject(state.reaper_job, (HANDLE) proc);
 
 	return 0;
 }
@@ -257,11 +265,45 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
 	return ERROR_CALL_NOT_IMPLEMENTED;
 }
 
-void WINAPI service_main(DWORD argc, LPTSTR *argv) {
+/* damnit mingw */
+#ifndef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+#define JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 0x00002000
+#endif
+
+int setup_reaper_job() {
+	JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli;
+	memset(&jeli, '\0', sizeof(jeli));
+
+	if( !(state.reaper_job = CreateJobObject(NULL, NULL)) )
+		return 1;
+
+	jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+	if( !SetInformationJobObject(
+			state.reaper_job, JobObjectExtendedLimitInformation, &jeli,
+			sizeof(jeli)) )
+		return 1;
+
+	return 0;
+}
+
+int setup_device_notification() {
 	DEV_BROADCAST_DEVICEINTERFACE filter;
 	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
 		{0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73}};
 
+	filter.dbcc_size = sizeof(filter);
+	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+	filter.dbcc_reserved = 0;
+	filter.dbcc_classguid = vcp_guid;
+	filter.dbcc_name[0] = '\0';
+
+	if( !RegisterDeviceNotification((HANDLE) state.hstatus, &filter,
+									DEVICE_NOTIFY_SERVICE_HANDLE))
+		return 1;
+	return 0;
+}
+
+void WINAPI service_main(DWORD argc, LPTSTR *argv) {
 	state.hstatus = RegisterServiceCtrlHandlerEx(
 		SERVICE_NAME, control_handler, NULL);
 
@@ -281,14 +323,10 @@ void WINAPI service_main(DWORD argc, LPTSTR *argv) {
 
 	scan_connected_devices(&state);
 
-	filter.dbcc_size = sizeof(filter);
-	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
-	filter.dbcc_reserved = 0;
-	filter.dbcc_classguid = vcp_guid;
-	filter.dbcc_name[0] = '\0';
+	if( setup_reaper_job() )
+		goto err_rdnotification;
 
-	if( !RegisterDeviceNotification((HANDLE) state.hstatus, &filter,
-									DEVICE_NOTIFY_SERVICE_HANDLE))
+	if( setup_device_notification() )
 		goto err_rdnotification;
 
 	return;
@@ -309,7 +347,6 @@ int detector_run(const char *exec_path) {
 		{NULL, NULL}
 	};
 
-	/* your APIs suck, fuck you. */
 	StartServiceCtrlDispatcher(services);
 	return 0;
 }
