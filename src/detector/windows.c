@@ -321,10 +321,10 @@ void WINAPI service_main(DWORD argc, LPTSTR *argv) {
 		goto err_asprintf;
 	}
 
-	scan_connected_devices(&state);
-
 	if( setup_reaper_job() )
 		goto err_rdnotification;
+
+	scan_connected_devices(&state);
 
 	if( setup_device_notification() )
 		goto err_rdnotification;
