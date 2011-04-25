@@ -180,25 +180,30 @@ err_manager:
 	return NULL;
 }
 
-void WINAPI control_handler(DWORD request) {
-	switch( request ) {
+DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
+	switch( ctrl ) {
 	case SERVICE_CONTROL_SHUTDOWN:
 	case SERVICE_CONTROL_STOP:
 		state.svc_status.dwWin32ExitCode = 0;
 		state.svc_status.dwCurrentState  = SERVICE_STOPPED;
 		SetServiceStatus(state.hstatus, &state.svc_status);
-		return;
+		return NO_ERROR;
+
+	case SERVICE_CONTROL_INTERROGATE:
+		SetServiceStatus(state.hstatus, &state.svc_status);
+		return NO_ERROR;
 
 	default:
 		break;
 	}
 
-	SetServiceStatus(state.hstatus, &state.svc_status);
-	return;
+	return ERROR_CALL_NOT_IMPLEMENTED;
 }
 
 void WINAPI service_main(DWORD argc, LPTSTR *argv) {
-	state.hstatus = RegisterServiceCtrlHandler(SERVICE_NAME, control_handler);
+	state.hstatus = RegisterServiceCtrlHandlerEx(
+		SERVICE_NAME, control_handler, NULL);
+
 	if( !state.hstatus )
 		return;
 
