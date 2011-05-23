@@ -93,7 +93,16 @@ DECLARE_INFO_PROP(size, "ii", monome_get_cols(state->monome),
 DECLARE_INFO_PROP(host, "s", lo_address_get_hostname(state->outgoing))
 DECLARE_INFO_PROP(port, "i", atoi(lo_address_get_port(state->outgoing)))
 DECLARE_INFO_PROP(prefix, "s", state->config.app.osc_prefix)
-DECLARE_INFO_PROP(rotation, "i", monome_get_rotation(state->monome) * 90)
+
+static void info_reply_rotation(lo_address *to, sosc_state_t *state) {
+	if( monome_get_cols(state->monome) != monome_get_rows(state->monome) )
+		info_reply_size(to, state);
+
+	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/rotation", "i",
+	             monome_get_rotation(state->monome) * 90);
+}
+
+DECLARE_INFO_HANDLERS(rotation);
 
 static void info_reply_all(lo_address *to, sosc_state_t *state) {
 	info_reply_id(to, state);
