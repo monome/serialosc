@@ -30,7 +30,7 @@ typedef struct {
 	__extension__ union {
 		struct {
 			size_t devnode_len;
-			char *devnode;
+			const char *devnode;
 		} PACKED connection;
 
 		struct {

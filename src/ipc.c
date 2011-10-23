@@ -46,19 +46,19 @@ int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 {
 	ssize_t nbytes;
+	char *nodebuf;
 
-	if ((nbytes = read(fd, buf, sizeof(*buf)) < sizeof(*buf))
+	if ((nbytes = read(fd, buf, sizeof(*buf))) < sizeof(*buf)
 		|| buf->magic != IPC_MAGIC)
 		return -1;
 
 	switch (buf->type) {
 	case SOSC_DEVICE_CONNECTION:
-		buf->connection.devnode = s_calloc(buf->connection.devnode_len + 1,
-		                                   sizeof(char));
+		nodebuf = s_calloc(buf->connection.devnode_len + 1, sizeof(char));
 
-		if (read(fd, buf->connection.devnode, buf->connection.devnode_len)
+		if (read(fd, nodebuf, buf->connection.devnode_len)
 			< buf->connection.devnode_len) {
-			s_free(buf->connection.devnode);
+			s_free(nodebuf);
 
 			buf->connection.devnode = NULL;
 			buf->connection.devnode_len = 0;
@@ -66,7 +66,8 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 			return -1;
 		}
 
-		buf->connection.devnode[buf->connection.devnode_len] = 0;
+		nodebuf[buf->connection.devnode_len] = 0;
+		buf->connection.devnode = nodebuf;
 		nbytes += buf->connection.devnode_len;
 
 	default:

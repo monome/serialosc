@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <time.h>
 
@@ -114,8 +115,11 @@ static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 }
 
 void server_run(monome_t *monome) {
-	sosc_state_t state = { .monome = monome };
 	char *svc_name;
+	sosc_state_t state = {
+		.monome = monome,
+		.ipc_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
+	};
 
 	if( sosc_config_read(monome_get_serial(state.monome), &state.config) ) {
 		fprintf(

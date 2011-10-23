@@ -29,6 +29,7 @@
 #include <monome.h>
 
 #include "serialosc.h"
+#include "ipc.h"
 
 
 typedef struct {
@@ -52,18 +53,18 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static int spawn_server(const char *exec_path, const char *devnode) {
-	switch( fork() ) {
-	case 0:  break;
-	case -1: perror("spawn_server fork"); return 1;
-	default: return 0;
-	}
+static void send_connect(const char *devnode)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_CONNECTION,
 
-	execlp(exec_path, exec_path, devnode, NULL);
+		.connection = {
+			.devnode = devnode,
+			.devnode_len = strlen(devnode)
+		}
+	};
 
-	/* only get here if an error occurs */
-	perror("spawn_server execlp");
-	return 1;
+	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
 static monome_t *monitor_attach(detector_state_t *state) {
@@ -90,7 +91,7 @@ static monome_t *monitor_attach(detector_state_t *state) {
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
 		if( *(udev_device_get_action(ud)) == 'a' )
-			spawn_server(state->exec_path, udev_device_get_devnode(ud));
+			send_connect(udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
 	} while( 1 );
@@ -116,7 +117,7 @@ int scan_connected_devices(detector_state_t *state) {
 			state->u, udev_list_entry_get_name(cursor));
 
 		if( (devnode = udev_device_get_devnode(ud)) )
-			spawn_server(state->exec_path, devnode);
+			send_connect(devnode);
 
 		udev_device_unref(ud);
 	} while( (cursor = udev_list_entry_get_next(cursor)) );

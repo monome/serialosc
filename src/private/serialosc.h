@@ -43,6 +43,7 @@ typedef struct {
 	monome_t *monome;
 	lo_address *outgoing;
 	lo_server *server;
+	int ipc_fd;
 
 	DNSServiceRef ref;
 
@@ -60,4 +61,4 @@ int sosc_config_write(const char *serial, sosc_state_t *state);
 
 void sosc_port_itos(char *dest, long int port);
 
-#endif /* defined __SERIALOSC_H_ */
+#endif /* defined SERIALOSC_H */
