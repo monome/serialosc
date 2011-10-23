@@ -18,7 +18,7 @@ SERIALOSC_OBJS += $(PLATFORM_$(PLATFORM)_OBJS)
 SERIALOSC_OBJS += detector/$(DETECTOR).o
 SERIALOSC_OBJS += event_loop/$(EVLOOP).o
 
-all: serialosc
+all: serialoscd
 
 install: all
 	$(INSTALL) -d $(BINDIR)
@@ -30,8 +30,8 @@ clean:
 	echo "  CLEAN   src"
 	rm -f serialosc $(SERIALOSC_OBJS)
 
-serialosc: $(SERIALOSC_OBJS)
-	echo "  LD      src/serialosc"
+serialoscd: $(SERIALOSC_OBJS)
+	echo "  LD      src/serialoscd"
 	$(LD) -o $@ $(SERIALOSC_OBJS) $(LDFLAGS) 
 
 .c.o:
