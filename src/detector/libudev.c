@@ -35,8 +35,6 @@
 typedef struct {
 	struct udev *u;
 	struct udev_monitor *um;
-
-	const char *exec_path;
 } detector_state_t;
 
 
@@ -127,11 +125,8 @@ int scan_connected_devices(detector_state_t *state) {
 }
 
 int detector_run(const char *exec_path) {
-	detector_state_t state = {
-		.exec_path = exec_path
-	};
+	detector_state_t state;
 
-	assert(exec_path);
 	disable_subproc_waiting();
 	state.u = udev_new();
 
