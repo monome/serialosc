@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 #include <monome.h>
 
@@ -82,6 +83,8 @@ static int detector_party(char *progname)
 		return 0;
 	}
 
+	progname[strlen(progname) - 1] = 'm';
+
 	/* run as the detector process */
 	if (detector_run(progname))
 		return 1;
@@ -99,6 +102,8 @@ int main(int argc, char **argv)
 		else
 			return EXIT_SUCCESS;
 	}
+
+	argv[0][strlen(argv[0]) - 1] = 0;
 
 	/* run as a device OSC server */
 	if (!(device = monome_open(argv[1])))
