@@ -58,7 +58,7 @@ int event_loop(const sosc_state_t *state) {
 				return 1;
 
 			default:
-				printf("event_loop() error: %d\n", GetLastError());
+				fprintf(stderr, "event_loop() error: %d\n", GetLastError());
 				return 1;
 			}
 
@@ -72,7 +72,8 @@ int event_loop(const sosc_state_t *state) {
 
 		case WAIT_ABANDONED_0:
 		case WAIT_FAILED:
-			printf("event_loop(): wait failed: %ld\n", GetLastError());
+			fprintf(stderr, "event_loop(): wait failed: %ld\n",
+			        GetLastError());
 			return 1;
 		}
 	} while ( 1 );

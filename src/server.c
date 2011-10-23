@@ -178,15 +178,15 @@ void server_run(monome_t *monome) {
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
 
-	printf("serialosc [%s]: connected, server running on port %d\n",
-	       monome_get_serial(state.monome), lo_server_get_port(state.server));
+	fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
+	        monome_get_serial(state.monome), lo_server_get_port(state.server));
 
 	send_connection_status(&state, 1);
 	event_loop(&state);
 	send_connection_status(&state, 0);
 
-	printf("serialosc [%s]: disconnected, exiting\n",
-	       monome_get_serial(state.monome));
+	fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
+	        monome_get_serial(state.monome));
 
 	DNSServiceRefDeallocate(state.ref);
 
