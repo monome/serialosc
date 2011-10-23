@@ -6,6 +6,7 @@ PLATFORM_darwin_OBJS  = platform/posix.o platform/darwin.o
 PLATFORM_windows_OBJS = platform/windows.o
 
 SERIALOSC_OBJS  = serialosc.o
+SERIALOSC_OBJS += ipc.o
 SERIALOSC_OBJS += util.o
 SERIALOSC_OBJS += server.o
 SERIALOSC_OBJS += config.o
