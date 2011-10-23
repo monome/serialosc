@@ -21,12 +21,26 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 #include <monome.h>
 
 #include "serialosc.h"
 #include "ipc.h"
 
+
+static void disable_subproc_waiting() {
+	struct sigaction s;
+
+	memset(&s, 0, sizeof(struct sigaction));
+	s.sa_flags = SA_NOCLDWAIT;
+	s.sa_handler = SIG_IGN;
+
+	if( sigaction(SIGCHLD, &s, NULL) < 0 ) {
+		perror("disable_subproc_waiting");
+		exit(EXIT_FAILURE);
+	}
+}
 
 static int spawn_server(const char *exec_path, const char *devnode)
 {
@@ -46,6 +60,8 @@ static int spawn_server(const char *exec_path, const char *devnode)
 static void read_detector_msgs(const char *progname, int fd)
 {
 	sosc_ipc_msg_t msg;
+
+	disable_subproc_waiting();
 
 	do {
 		if (sosc_ipc_msg_read(fd, &msg) < 0)

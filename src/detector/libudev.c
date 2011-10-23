@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
@@ -37,19 +36,6 @@ typedef struct {
 	struct udev_monitor *um;
 } detector_state_t;
 
-
-static void disable_subproc_waiting() {
-	struct sigaction s;
-
-	memset(&s, 0, sizeof(struct sigaction));
-	s.sa_flags = SA_NOCLDWAIT;
-	s.sa_handler = SIG_IGN;
-
-	if( sigaction(SIGCHLD, &s, NULL) < 0 ) {
-		perror("disable_subproc_waiting");
-		exit(EXIT_FAILURE);
-	}
-}
 
 static void send_connect(const char *devnode)
 {
@@ -127,7 +113,6 @@ int scan_connected_devices(detector_state_t *state) {
 int detector_run(const char *exec_path) {
 	detector_state_t state;
 
-	disable_subproc_waiting();
 	state.u = udev_new();
 
 	if( scan_connected_devices(&state) )
