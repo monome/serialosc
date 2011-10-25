@@ -28,6 +28,7 @@
 #include <monome.h>
 
 #include "serialosc.h"
+#include "ipc.h"
 
 
 typedef struct {
