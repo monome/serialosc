@@ -72,8 +72,6 @@ static int wait_on_parent_usbdevice(io_service_t device) {
 }
 
 static void iterate_devices(void *context, io_iterator_t iter) {
-	notify_state_t *state = context;
-
 	io_service_t device;
 	io_struct_inband_t devnode;
 	unsigned int len = 256;
