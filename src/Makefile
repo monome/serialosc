@@ -28,7 +28,7 @@ install: all
 
 clean:
 	echo "  CLEAN   src"
-	rm -f serialosc $(SERIALOSC_OBJS)
+	rm -f serialoscd $(SERIALOSC_OBJS)
 
 serialoscd: $(SERIALOSC_OBJS)
 	echo "  LD      src/serialoscd"
