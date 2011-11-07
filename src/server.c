@@ -32,6 +32,7 @@
 
 #include "serialosc.h"
 #include "osc.h"
+#include "ipc.h"
 
 
 #define DEFAULT_OSC_PREFIX      "/monome"
@@ -103,19 +104,29 @@ static void send_connection_status(sosc_state_t *state, int status) {
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "");
 }
 
-static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
-                   DNSServiceErrorType errorCode, const char *name,
-                   const char *regtype, const char *domain, void *context) {
+static void write_osc_port_change(int fd, uint16_t port)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_OSC_PORT_CHANGE,
+		.port_change = {
+			.port = port
+		}
+	};
 
-	/* on OSX, the bonjour library insists on having a callback passed to
-	   DNSServiceRegister. */
-
-	return;
-
+	sosc_ipc_msg_write(fd, &msg);
 }
 
-void server_run(monome_t *monome) {
-	char *svc_name;
+static void write_disconnection(int fd)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_DISCONNECTION
+	};
+
+	sosc_ipc_msg_write(fd, &msg);
+}
+
+void server_run(monome_t *monome)
+{
 	sosc_state_t state = {
 		.monome = monome,
 		.ipc_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
@@ -139,33 +150,6 @@ void server_run(monome_t *monome) {
 		goto err_lo_addr;
 	}
 
-	svc_name = s_asprintf(
-		"%s (%s)", monome_get_friendly_name(state.monome),
-		monome_get_serial(state.monome));
-
-	if( !svc_name ) {
-		fprintf(
-			stderr, "serialosc [%s]: couldn't allocate memory, aieee!\n",
-			monome_get_serial(state.monome));
-		goto err_svc_name;
-	}
-
-	DNSServiceRegister(
-		/* sdref          */  &state.ref,
-		/* interfaceIndex */  0,
-		/* flags          */  0,
-		/* name           */  svc_name,
-		/* regtype        */  "_monome-osc._udp",
-		/* domain         */  NULL,
-		/* host           */  NULL,
-		/* port           */  htons(lo_server_get_port(state.server)),
-		/* txtLen         */  0,
-		/* txtRecord      */  NULL,
-		/* callBack       */  mdns_callback,
-		/* context        */  NULL);
-
-	free(svc_name);
-
 #define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
 	HANDLE(MONOME_BUTTON_DOWN, handle_press);
 	HANDLE(MONOME_BUTTON_UP, handle_press);
@@ -182,17 +166,23 @@ void server_run(monome_t *monome) {
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
 
-	fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
-	        monome_get_serial(state.monome), lo_server_get_port(state.server));
+	if (state.ipc_fd < 0) {
+		fprintf(
+			stderr, "serialosc [%s]: connected, server running on port %d\n",
+			monome_get_serial(state.monome), lo_server_get_port(state.server));
+	} else
+		write_osc_port_change(
+			state.ipc_fd, lo_server_get_port(state.server));
 
 	send_connection_status(&state, 1);
 	event_loop(&state);
 	send_connection_status(&state, 0);
 
-	fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
-	        monome_get_serial(state.monome));
-
-	DNSServiceRefDeallocate(state.ref);
+	if (state.ipc_fd < 0) {
+		fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
+				monome_get_serial(state.monome));
+	} else
+		write_disconnection(state.ipc_fd);
 
 	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
 		fprintf(
@@ -200,7 +190,6 @@ void server_run(monome_t *monome) {
 			monome_get_serial(state.monome));
 	}
 
-err_svc_name:
 	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
