@@ -41,9 +41,6 @@ MANDIR=;
 EVLOOP="poll";
 LIBUDEV_VERSION=;
 
-DNSSD_CFLAGS=;
-DNSSD_LDFLAGS="-ldns_sd";
-
 LIBMONOME_VERSION=;
 LIBMONOME_PREFIX=$PREFIX;
 LIBMONOME_CFLAGS=;
@@ -261,23 +258,6 @@ EOF
 	return 0;
 }
 
-check_dnssd() {
-	cat <<EOF > .conftests/dnssd.c
-#include <dns_sd.h>
-
-int main(int argc, char **argv) {
-	DNSServiceRef ref;
-	return 0;
-}
-EOF
-
-	compile_and_run dnssd $DNSSD_CFLAGS $DNSSD_LDFLAGS;
-	RET=$?;
-
-	[ $RET -ne 0 ] && return $RET;
-	return 0;
-}
-
 check_lo () {
 	cat <<EOF > .conftests/lo.c
 #include <lo/lo.h>
@@ -476,8 +456,6 @@ case $PLATFORM in
 
 		LO_LDFLAGS="$LO_LDFLAGS -lws2_32";
 		LIBCONFUSE_LDFLAGS="$LIBCONFUSE_LDFLAGS -lintl";
-
-		DNSSD_LDFLAGS="-ldnssd";
 		;;
 
 	*)
@@ -534,17 +512,6 @@ conf_libudev() {
 	fi
 }
 
-conf_dnssd() {
-	echo_n "    checking for libdns_sd:       ";
-	if check_dnssd; then
-		style_success "indeed";
-		CFLAGS="$CFLAGS $DNSSD_CFLAGS";
-		LDFLAGS="$LDFLAGS $DNSSD_LDFLAGS";
-	else
-		die "no mdns";
-	fi
-}
-
 conf_liblo() {
 	echo_n "    checking for liblo:           ";
 	if check_lo; then
@@ -595,10 +562,6 @@ echo ""
 
 if [ $PLATFORM = "linux" ]; then
 	conf_libudev;
-fi
-
-if [ $PLATFORM != "darwin" ]; then
-	conf_dnssd;
 fi
 
 conf_liblo;
