@@ -103,7 +103,20 @@ static void send_connection_status(sosc_state_t *state, int status) {
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "");
 }
 
-static void write_osc_port_change(int fd, uint16_t port)
+static void send_device_info(int fd, monome_t *monome)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_INFO,
+		.device_info = {
+			.serial = (char *) monome_get_serial(monome),
+			.friendly = (char *) monome_get_friendly_name(monome)
+		}
+	};
+
+	sosc_ipc_msg_write(fd, &msg);
+}
+
+static void send_osc_port_change(int fd, uint16_t port)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_OSC_PORT_CHANGE,
@@ -115,7 +128,7 @@ static void write_osc_port_change(int fd, uint16_t port)
 	sosc_ipc_msg_write(fd, &msg);
 }
 
-static void write_disconnection(int fd)
+static void send_disconnection(int fd)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_DISCONNECTION
@@ -169,9 +182,11 @@ void server_run(monome_t *monome)
 		fprintf(
 			stderr, "serialosc [%s]: connected, server running on port %d\n",
 			monome_get_serial(state.monome), lo_server_get_port(state.server));
-	} else
-		write_osc_port_change(
+	} else {
+		send_device_info(state.ipc_fd, monome);
+		send_osc_port_change(
 			state.ipc_fd, lo_server_get_port(state.server));
+	}
 
 	send_connection_status(&state, 1);
 	event_loop(&state);
@@ -181,7 +196,7 @@ void server_run(monome_t *monome)
 		fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
 				monome_get_serial(state.monome));
 	} else
-		write_disconnection(state.ipc_fd);
+		send_disconnection(state.ipc_fd);
 
 	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
 		fprintf(

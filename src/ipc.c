@@ -15,11 +15,75 @@
  */
 
 #include <unistd.h>
+#include <stdarg.h>
+#include <string.h>
 
 #include "serialosc.h"
 #include "ipc.h"
 
 #define IPC_MAGIC 0x505C
+
+static int read_strdata(int fd, size_t n, ...)
+{
+	const char **cur;
+	uint16_t magic;
+	size_t slen;
+	va_list ap;
+	char *buf;
+
+	va_start(ap, n);
+
+	while (n--) {
+		cur = va_arg(ap, const char **);
+		*cur = NULL;
+
+		read(fd, &slen, sizeof(slen));
+		if (!(buf = s_calloc(slen, sizeof(char)))) {
+			/* XXX: proper error handling? i.e. what do we do with the 
+			        strings that are already allocated? we can't NULL
+			        all of them at the start, I guess that's up to the
+					caller? */
+			continue;
+		}
+
+		if (read(fd, buf, slen) < slen) {
+			s_free(buf);
+			return 1;
+		}
+
+		*cur = buf;
+
+		if (read(fd, &magic, sizeof(magic)) < sizeof(magic)
+			|| magic != IPC_MAGIC)
+			return 1;
+	}
+
+	va_end(ap);
+
+	return 0;
+
+}
+
+static int write_strdata(int fd, size_t n, ...)
+{
+	uint16_t magic = IPC_MAGIC;
+	const char *cur;
+	size_t slen;
+	va_list ap;
+
+	va_start(ap, n);
+	while (n--) {
+		cur = va_arg(ap, const char *);
+		slen = strlen(cur);
+
+		write(fd, &slen, sizeof(slen));
+		write(fd, cur, slen);
+		write(fd, &magic, sizeof(magic));
+	}
+	va_end(ap);
+
+	return 0;
+}
 
 int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 {
@@ -32,9 +96,15 @@ int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
-		if( write(fd, msg->connection.devnode, msg->connection.devnode_len)
-		    < msg->connection.devnode_len)
-			return -1; /* sorry player. not much we can do. */
+		if (write_strdata(fd, 1, msg->connection.devnode))
+			return -1;
+
+		break;
+
+	case SOSC_DEVICE_INFO:
+		if (write_strdata(fd, 2, msg->device_info.serial,
+		                  msg->device_info.friendly))
+			return -1;
 
 	default:
 		break;
@@ -46,7 +116,6 @@ int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 {
 	ssize_t nbytes;
-	char *nodebuf;
 
 	if ((nbytes = read(fd, buf, sizeof(*buf))) < sizeof(*buf)
 		|| buf->magic != IPC_MAGIC)
@@ -54,21 +123,18 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 
 	switch (buf->type) {
 	case SOSC_DEVICE_CONNECTION:
-		nodebuf = s_calloc(buf->connection.devnode_len + 1, sizeof(char));
-
-		if (read(fd, nodebuf, buf->connection.devnode_len)
-			< buf->connection.devnode_len) {
-			s_free(nodebuf);
-
-			buf->connection.devnode = NULL;
-			buf->connection.devnode_len = 0;
-
+		buf->connection.devnode = NULL;
+		if (read_strdata(fd, 1, &buf->connection.devnode))
 			return -1;
-		}
 
-		nodebuf[buf->connection.devnode_len] = 0;
-		buf->connection.devnode = nodebuf;
-		nbytes += buf->connection.devnode_len;
+		break;
+
+	case SOSC_DEVICE_INFO:
+		buf->device_info.serial = buf->device_info.friendly = NULL;
+
+		if (read_strdata(fd, 2, &buf->device_info.serial,
+		                 &buf->device_info.friendly))
+			return -1;
 
 	default:
 		break;

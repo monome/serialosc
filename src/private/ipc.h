@@ -20,6 +20,7 @@
 
 typedef enum {
 	SOSC_DEVICE_CONNECTION,
+	SOSC_DEVICE_INFO,
 	SOSC_DEVICE_DISCONNECTION,
 	SOSC_OSC_PORT_CHANGE
 } sosc_ipc_type_t;
@@ -29,9 +30,13 @@ typedef struct {
 
 	__extension__ union {
 		struct {
-			size_t devnode_len;
-			const char *devnode;
+			char *devnode;
 		} PACKED connection;
+
+		struct {
+			char *serial;
+			char *friendly;
+		} PACKED device_info;
 
 		struct {
 			uint16_t port;

@@ -114,7 +114,7 @@ static void read_detector_msgs(const char *progname, int fd)
 				printf(" - new device %s (#%d)\n", msg.connection.devnode,
 					   children + 1);
 
-				s_free((char *) msg.connection.devnode);
+				s_free(msg.connection.devnode);
 
 				children++;
 				fds[children].fd = child_fd;
@@ -122,8 +122,14 @@ static void read_detector_msgs(const char *progname, int fd)
 
 				break;
 
-			case SOSC_OSC_PORT_CHANGE:
-				printf(" - port change %d\n", msg.port_change.port);
+			case SOSC_DEVICE_INFO:
+				printf(" - devinfo\n"
+					   "   - serial: %s\n"
+					   "   - friendly: %s\n",
+					   msg.device_info.serial, msg.device_info.friendly);
+
+				s_free(msg.device_info.serial);
+				s_free(msg.device_info.friendly);
 				break;
 
 			case SOSC_DEVICE_DISCONNECTION:
@@ -138,6 +144,10 @@ static void read_detector_msgs(const char *progname, int fd)
 				i--;
 
 				printf(" - disconnection\n");
+				break;
+
+			case SOSC_OSC_PORT_CHANGE:
+				printf(" - port change %d\n", msg.port_change.port);
 				break;
 			}
 		}
