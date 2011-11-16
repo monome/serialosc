@@ -145,5 +145,7 @@ int sosc_config_write(const char *serial, sosc_state_t *state) {
 	cfg_print(cfg, f);
 	fclose(f);
 
+	cfg_free(cfg);
+
 	return 0;
 }
