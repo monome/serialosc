@@ -29,10 +29,8 @@ int sosc_config_create_directory() {
 	char *cdir;
 
 	cdir = sosc_get_config_directory();
-	if( !stat(cdir, buf) )
-		return 0; /* all is well */
 
-	if( mkdir(cdir, S_IRWXU) )
+	if( stat(cdir, buf) && mkdir(cdir, S_IRWXU) )
 		goto err_mkdir;
 
 	s_free(cdir);

@@ -35,19 +35,21 @@ int sosc_config_create_directory() {
 	struct stat buf[1];
 
 	cdir = sosc_get_config_directory();
-	if( !stat(cdir, buf) )
-		return 0; /* all is well */
 
-	if( !getenv("XDG_CONFIG_HOME") ) {
-		xdgdir = s_asprintf("%s/.config", getenv("HOME"));
+	if( stat(cdir, buf) ) {
+		if( !getenv("XDG_CONFIG_HOME") ) {
+			xdgdir = s_asprintf("%s/.config", getenv("HOME"));
 
-		/* well, I guess somebody's got to do it */
-		if( stat(xdgdir, buf) && mkdir(xdgdir, S_IRWXU) )
-			goto err_xdg;
+			/* well, I guess somebody's got to do it */
+			if( stat(xdgdir, buf) && mkdir(xdgdir, S_IRWXU) )
+				goto err_xdg;
+
+			s_free(xdgdir);
+		}
+
+		if( mkdir(cdir, S_IRWXU) )
+			goto err_mkdir;
 	}
-
-	if( mkdir(cdir, S_IRWXU) )
-		goto err_mkdir;
 
 	s_free(cdir);
 	return 0;
