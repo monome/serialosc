@@ -30,6 +30,15 @@
 #include "ipc.h"
 
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof(*x))
+#define MAX_DEVICES 32
+
+typedef struct sosc_device_info {
+	int ready;
+
+	uint16_t port;
+	char *serial;
+	char *friendly;
+} sosc_device_info_t;
 
 static void disable_subproc_waiting() {
 	struct sigaction s;
@@ -78,7 +87,8 @@ static int spawn_server(const char *exec_path, const char *devnode)
 static void read_detector_msgs(const char *progname, int fd)
 {
 	int child_fd, children, i;
-	struct pollfd fds[33];
+	struct pollfd fds[MAX_DEVICES + 1];
+	sosc_device_info_t *devs[MAX_DEVICES] = {[0 ... MAX_DEVICES - 1] = NULL};
 	sosc_ipc_msg_t msg;
 
 	disable_subproc_waiting();
@@ -116,38 +126,54 @@ static void read_detector_msgs(const char *progname, int fd)
 
 				s_free(msg.connection.devnode);
 
+				/* devs[] is 0-indexed, fds[] is 1-indexed because of the
+				   fd to the monitor process */
+				if (!(devs[children] = s_calloc(1, sizeof(*devs[children])))) {
+					fprintf(stderr, "calloc failed!\n");
+					continue;
+				}
+
 				children++;
 				fds[children].fd = child_fd;
 				fds[children].events = POLLIN;
 
 				break;
 
-			case SOSC_DEVICE_INFO:
-				printf(" - devinfo\n"
-					   "   - serial: %s\n"
-					   "   - friendly: %s\n",
-					   msg.device_info.serial, msg.device_info.friendly);
+			case SOSC_OSC_PORT_CHANGE:
+				devs[i - 1]->port = msg.port_change.port;
+				break;
 
-				s_free(msg.device_info.serial);
-				s_free(msg.device_info.friendly);
+			case SOSC_DEVICE_INFO:
+				devs[i - 1]->serial = msg.device_info.serial;
+				devs[i - 1]->friendly = msg.device_info.friendly;
+				break;
+
+			case SOSC_DEVICE_READY:
+				devs[i - 1]->ready = 1;
 				break;
 
 			case SOSC_DEVICE_DISCONNECTION:
-				/* close the fd */
+				printf(" - disconnection\n"
+				       "   - devinfo\n"
+					   "     - serial: %s\n"
+					   "     - friendly: %s\n",
+					  devs[i - 1]->serial, devs[i - 1]->friendly);
+
+				/* close the fd and free the devinfo struct */
 				close(fds[i].fd);
+				s_free(devs[i - 1]->serial);
+				s_free(devs[i - 1]->friendly);
+				s_free(devs[i - 1]);
+
 				/* shift everything in the array down by one */
 				memmove(&fds[i], &fds[i + 1], children - i + 1);
+				memmove(&devs[i - 1], &devs[i], children - i + 1);
 				children--;
 
 				/* and since fds[i + 1] has become fds[i], we'll
 				   repeat this iteration of the for() loop */
 				i--;
 
-				printf(" - disconnection\n");
-				break;
-
-			case SOSC_OSC_PORT_CHANGE:
-				printf(" - port change %d\n", msg.port_change.port);
 				break;
 			}
 		}
