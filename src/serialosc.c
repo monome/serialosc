@@ -28,6 +28,7 @@
 
 #include "serialosc.h"
 #include "ipc.h"
+#include "osc.h"
 
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof(*x))
 #define MAX_DEVICES 32
@@ -84,27 +85,89 @@ static int spawn_server(const char *exec_path, const char *devnode)
 	return -1;
 }
 
+typedef struct {
+	int count;
+	sosc_device_info_t *info[MAX_DEVICES];
+} sosc_dev_datastore_t;
+
+static lo_server *srv;
+
+static int portstr(char *dest, int src) {
+	return snprintf(dest, 6, "%d", src);
+}
+
+OSC_HANDLER_FUNC(dsc_list_devices)
+{
+	sosc_dev_datastore_t *devs = user_data;
+	lo_address *dst;
+	char port[6];
+	int i;
+
+	portstr(port, argv[1]->i);
+
+	if (!(dst = lo_address_new(&argv[0]->s, port))) {
+		fprintf(stderr, "dsc_list_devices(): error in lo_address_new()\n");
+		return 1;
+	}
+
+	for (i = 0; i < devs->count; i++)
+		lo_send_from(dst, srv, LO_TT_IMMEDIATE, "/serialosc/device", "ssi",
+					 devs->info[i]->serial,
+					 devs->info[i]->friendly,
+					 devs->info[i]->port);
+
+	lo_address_free(dst);
+
+	return 0;
+}
+
+static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
+{
+	lo_server *srv;
+
+	if (!(srv = lo_server_new("12002", NULL)))
+		return NULL;
+
+	lo_server_add_method(srv, "/serialosc/list", "si", dsc_list_devices, devs);
+
+	return srv;
+}
+
 static void read_detector_msgs(const char *progname, int fd)
 {
-	int child_fd, children, i;
-	struct pollfd fds[MAX_DEVICES + 1];
-	sosc_device_info_t *devs[MAX_DEVICES] = {[0 ... MAX_DEVICES - 1] = NULL};
+	sosc_dev_datastore_t devs = {
+		0, {[0 ... MAX_DEVICES - 1] = NULL}
+	};
+	struct pollfd fds[MAX_DEVICES + 2];
 	sosc_ipc_msg_t msg;
+	int child_fd, i;
+
+#define FD_COUNT (devs.count + 2)
+#define DEVINDEX(x) (x + 2)
 
 	disable_subproc_waiting();
 
-	fds[0].fd = fd;
+	if (!(srv = setup_osc_server(&devs))) {
+		perror("couldn't init OSC server");
+		return;
+	}
+
+	fds[0].fd = lo_server_get_socket_fd(srv);
 	fds[0].events = POLLIN;
 
-	children = 0;
+	fds[1].fd = fd;
+	fds[1].events = POLLIN;
 
 	do {
-		if (poll(fds, children + 1, -1) < 0) {
+		if (poll(fds, FD_COUNT, -1) < 0) {
 			perror("read_detector_msgs() poll");
 			break;
 		}
 
-		for (i = 0; i < children + 1; i++) {
+		if (fds[0].revents & POLLIN )
+			lo_server_recv_noblock(srv, 0);
+
+		for (i = 1; i < FD_COUNT; i++) {
 			if (!(fds[i].revents & POLLIN))
 				continue;
 
@@ -113,7 +176,7 @@ static void read_detector_msgs(const char *progname, int fd)
 
 			switch (msg.type) {
 			case SOSC_DEVICE_CONNECTION:
-				if (children >= ARRAY_LENGTH(fds)) {
+				if (devs.count >= ARRAY_LENGTH(fds)) {
 					s_free((char *) msg.connection.devnode);
 					fprintf(stderr,
 							"read_detector_msgs(): too many monomes\n");
@@ -122,34 +185,33 @@ static void read_detector_msgs(const char *progname, int fd)
 
 				child_fd = spawn_server(progname, msg.connection.devnode);
 				printf(" - new device %s (#%d)\n", msg.connection.devnode,
-					   children + 1);
+					   devs.count + 1);
 
 				s_free(msg.connection.devnode);
 
-				/* devs[] is 0-indexed, fds[] is 1-indexed because of the
-				   fd to the monitor process */
-				if (!(devs[children] = s_calloc(1, sizeof(*devs[children])))) {
+				if (!(devs.info[devs.count] = s_calloc(1, sizeof(*devs.info[devs.count])))) {
 					fprintf(stderr, "calloc failed!\n");
 					continue;
 				}
 
-				children++;
-				fds[children].fd = child_fd;
-				fds[children].events = POLLIN;
+				fds[DEVINDEX(devs.count)].fd = child_fd;
+				fds[DEVINDEX(devs.count)].events = POLLIN;
+
+				devs.count++;
 
 				break;
 
 			case SOSC_OSC_PORT_CHANGE:
-				devs[i - 1]->port = msg.port_change.port;
+				devs.info[i - 2]->port = msg.port_change.port;
 				break;
 
 			case SOSC_DEVICE_INFO:
-				devs[i - 1]->serial = msg.device_info.serial;
-				devs[i - 1]->friendly = msg.device_info.friendly;
+				devs.info[i - 2]->serial = msg.device_info.serial;
+				devs.info[i - 2]->friendly = msg.device_info.friendly;
 				break;
 
 			case SOSC_DEVICE_READY:
-				devs[i - 1]->ready = 1;
+				devs.info[i - 2]->ready = 1;
 				break;
 
 			case SOSC_DEVICE_DISCONNECTION:
@@ -157,18 +219,18 @@ static void read_detector_msgs(const char *progname, int fd)
 				       "   - devinfo\n"
 					   "     - serial: %s\n"
 					   "     - friendly: %s\n",
-					  devs[i - 1]->serial, devs[i - 1]->friendly);
+					  devs.info[i - 2]->serial, devs.info[i - 2]->friendly);
 
 				/* close the fd and free the devinfo struct */
 				close(fds[i].fd);
-				s_free(devs[i - 1]->serial);
-				s_free(devs[i - 1]->friendly);
-				s_free(devs[i - 1]);
+				s_free(devs.info[i - 2]->serial);
+				s_free(devs.info[i - 2]->friendly);
+				s_free(devs.info[i - 2]);
 
 				/* shift everything in the array down by one */
-				memmove(&fds[i], &fds[i + 1], children - i + 1);
-				memmove(&devs[i - 1], &devs[i], children - i + 1);
-				children--;
+				memmove(&fds[i], &fds[i + 1], devs.count - i + 1);
+				memmove(&devs.info[i - 2], &devs.info[i - 1], devs.count - i + 1);
+				devs.count--;
 
 				/* and since fds[i + 1] has become fds[i], we'll
 				   repeat this iteration of the for() loop */
