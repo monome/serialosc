@@ -90,6 +90,20 @@ typedef struct {
 	sosc_device_info_t *info[MAX_DEVICES];
 } sosc_dev_datastore_t;
 
+#define MAX_NOTIFICATION_ENDPOINTS 32
+
+typedef struct {
+	char host[256];
+	char port[6];
+} sosc_notification_endpoint_t;
+
+typedef struct {
+	int count;
+	sosc_notification_endpoint_t endpoints[MAX_NOTIFICATION_ENDPOINTS];
+} sosc_notifications_t;
+
+sosc_notifications_t notifications = {0};
+
 static lo_server *srv;
 
 static int portstr(char *dest, int src) {
@@ -121,6 +135,23 @@ OSC_HANDLER_FUNC(dsc_list_devices)
 	return 0;
 }
 
+OSC_HANDLER_FUNC(add_notification_endpoint)
+{
+	sosc_notification_endpoint_t *n;
+
+	if (notifications.count >= MAX_NOTIFICATION_ENDPOINTS)
+		return 1;
+
+	n = &notifications.endpoints[notifications.count];
+
+	portstr(n->port, argv[1]->i);
+	strncpy(n->host, &argv[0]->s, sizeof(n->host));
+	n->host[sizeof(n->host) - 1] = '\0';
+
+	notifications.count++;
+	return 0;
+}
+
 static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
 {
 	lo_server *srv;
@@ -129,8 +160,45 @@ static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
 		return NULL;
 
 	lo_server_add_method(srv, "/serialosc/list", "si", dsc_list_devices, devs);
+	lo_server_add_method(srv, "/serialosc/update", "si", add_notification_endpoint, devs);
 
 	return srv;
+}
+
+static int holla(sosc_ipc_type_t type, sosc_device_info_t *dev)
+{
+	lo_address dst;
+	char *path;
+	int i;
+
+	switch (type) {
+	case SOSC_DEVICE_CONNECTION:
+		path = "/serialosc/add";
+		break;
+
+	case SOSC_DEVICE_DISCONNECTION:
+		path = "/serialosc/remove";
+		break;
+
+	default:
+		return 1;
+	}
+
+	for (i = 0; i < notifications.count; i++) {
+		if (!(dst = lo_address_new(
+		            notifications.endpoints[i].host,
+		            notifications.endpoints[i].port))) {
+			fprintf(stderr, "holla(): couldn't allocate lo_address\n");
+			continue;
+		}
+
+		lo_send_from(dst, srv, LO_TT_IMMEDIATE, path, "ssi",
+		             dev->serial, dev->friendly, dev->port);
+
+		lo_address_free(dst);
+	}
+
+	return 0;
 }
 
 static void read_detector_msgs(const char *progname, int fd)
@@ -140,7 +208,7 @@ static void read_detector_msgs(const char *progname, int fd)
 	};
 	struct pollfd fds[MAX_DEVICES + 2];
 	sosc_ipc_msg_t msg;
-	int child_fd, i;
+	int child_fd, i, notified;
 
 #define FD_COUNT (devs.count + 2)
 #define DEVINDEX(x) (x + 2)
@@ -159,6 +227,8 @@ static void read_detector_msgs(const char *progname, int fd)
 	fds[1].events = POLLIN;
 
 	do {
+		notified = 0;
+
 		if (poll(fds, FD_COUNT, -1) < 0) {
 			perror("read_detector_msgs() poll");
 			break;
@@ -212,6 +282,9 @@ static void read_detector_msgs(const char *progname, int fd)
 
 			case SOSC_DEVICE_READY:
 				devs.info[i - 2]->ready = 1;
+
+				holla(SOSC_DEVICE_CONNECTION, devs.info[i - 2]);
+				notified = 1;
 				break;
 
 			case SOSC_DEVICE_DISCONNECTION:
@@ -220,6 +293,9 @@ static void read_detector_msgs(const char *progname, int fd)
 					   "     - serial: %s\n"
 					   "     - friendly: %s\n",
 					  devs.info[i - 2]->serial, devs.info[i - 2]->friendly);
+
+				holla(SOSC_DEVICE_DISCONNECTION, devs.info[i - 2]);
+				notified = 1;
 
 				/* close the fd and free the devinfo struct */
 				close(fds[i].fd);
@@ -239,6 +315,9 @@ static void read_detector_msgs(const char *progname, int fd)
 				break;
 			}
 		}
+
+		if (notified)
+			notifications.count = 0;
 	} while (1);
 }
 
