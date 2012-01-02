@@ -31,7 +31,7 @@ static DWORD WINAPI lo_thread(LPVOID param) {
 	return 0;
 }
 
-int event_loop(const sosc_state_t *state) {
+int sosc_event_loop(const sosc_state_t *state) {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
 	HANDLE hres, lo_thd_res;
 	DWORD evt_mask;

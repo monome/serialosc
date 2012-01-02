@@ -137,7 +137,7 @@ static void send_simple_ipc(int fd, sosc_ipc_type_t type)
 	sosc_ipc_msg_write(fd, &msg);
 }
 
-void server_run(monome_t *monome)
+void sosc_server_run(monome_t *monome)
 {
 	sosc_state_t state = {
 		.monome = monome,
@@ -190,7 +190,7 @@ void server_run(monome_t *monome)
 	}
 
 	send_connection_status(&state, 1);
-	event_loop(&state);
+	sosc_event_loop(&state);
 	send_connection_status(&state, 0);
 
 	if (state.ipc_fd < 0) {

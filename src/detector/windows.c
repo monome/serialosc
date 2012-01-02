@@ -341,7 +341,7 @@ err:
 	return;
 }
 
-int detector_run(const char *exec_path) {
+int sosc_detector_run(const char *exec_path) {
 	SERVICE_TABLE_ENTRY services[] = {
 		{SERVICE_NAME, service_main},
 		{NULL, NULL}

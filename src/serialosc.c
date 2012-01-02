@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 		   XXX: add some sort of lock file to prevent two manager
 		        instances from running at the same time. */
 
-		if (supervisor_run(argv[0]))
+		if (sosc_supervisor_run(argv[0]))
 			return EXIT_FAILURE;
 		else
 			return EXIT_SUCCESS;
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 	if (!(device = monome_open(argv[1])))
 		return EXIT_FAILURE;
 
-	server_run(device);
+	sosc_server_run(device);
 	monome_close(device);
 
 	return EXIT_SUCCESS;

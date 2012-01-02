@@ -106,7 +106,7 @@ int scan_connected_devices(detector_state_t *state) {
 	return 0;
 }
 
-int detector_run(const char *exec_path) {
+int sosc_detector_run(const char *exec_path) {
 	detector_state_t state;
 
 	state.u = udev_new();

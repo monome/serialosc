@@ -320,7 +320,7 @@ static void read_detector_msgs(const char *progname, int fd)
 	} while (1);
 }
 
-int supervisor_run(char *progname)
+int sosc_supervisor_run(char *progname)
 {
 	int pipefds[2];
 
@@ -350,7 +350,7 @@ int supervisor_run(char *progname)
 	progname[strlen(progname) - 1] = 'm';
 
 	/* run as the detector process */
-	if (detector_run(progname))
+	if (sosc_detector_run(progname))
 		return 1;
 
 	return 0;
