@@ -320,7 +320,7 @@ static void read_detector_msgs(const char *progname, int fd)
 	} while (1);
 }
 
-int manager_run(char *progname)
+int supervisor_run(char *progname)
 {
 	int pipefds[2];
 

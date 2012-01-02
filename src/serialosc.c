@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 		   XXX: add some sort of lock file to prevent two manager
 		        instances from running at the same time. */
 
-		if (manager_run(argv[0]))
+		if (supervisor_run(argv[0]))
 			return EXIT_FAILURE;
 		else
 			return EXIT_SUCCESS;

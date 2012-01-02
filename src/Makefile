@@ -1,7 +1,7 @@
 CFLAGS += -I./private $(LO_CFLAGS) $(LIBMONOME_CFLAGS) $(LIBCONFUSE_CFLAGS)
 LDFLAGS += $(LO_LDFLAGS) $(LIBMONOME_LDFLAGS) $(LIBCONFUSE_LDFLAGS)
 
-POSIX_OBJS  = manager/posix.o
+POSIX_OBJS  = supervisor/posix.o
 POSIX_OBJS += platform/posix.o
 
 PLATFORM_linux_OBJS   = $(POSIX_OBJS) platform/linux.o
