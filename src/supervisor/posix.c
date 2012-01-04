@@ -327,7 +327,7 @@ int sosc_supervisor_run(char *progname)
 	sosc_config_create_directory();
 
 	if (pipe(pipefds) < 0) {
-		perror("detector_loop() pipe");
+		perror("sosc_supervisor_run() pipe");
 		return 0;
 	}
 
@@ -338,7 +338,7 @@ int sosc_supervisor_run(char *progname)
 		break;
 
 	case -1:
-		perror("detector_party() fork");
+		perror("sosc_supervisor_run() fork");
 		return 1;
 
 	default:
