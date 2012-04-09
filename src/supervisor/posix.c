@@ -249,14 +249,18 @@ static void read_detector_msgs(const char *progname, int fd)
 					s_free((char *) msg.connection.devnode);
 					fprintf(stderr,
 							"read_detector_msgs(): too many monomes\n");
+
+					s_free(msg.connection.devnode);
 					continue;
 				}
 
 				child_fd = spawn_server(progname, msg.connection.devnode);
-				printf(" - new device %s (#%d)\n", msg.connection.devnode,
-					   devs.count + 1);
-
 				s_free(msg.connection.devnode);
+
+				if (child_fd < 1) {
+					perror("read_detector_msgs: spawn");
+					continue;
+				}
 
 				if (!(devs.info[devs.count] = s_calloc(1, sizeof(*devs.info[devs.count])))) {
 					fprintf(stderr, "calloc failed!\n");
@@ -281,6 +285,9 @@ static void read_detector_msgs(const char *progname, int fd)
 
 			case SOSC_DEVICE_READY:
 				devs.info[i - 2]->ready = 1;
+
+				printf(" - new %s (%s)\n",
+					   devs.info[i - 2]->friendly, devs.info[i - 2]->serial);
 
 				notify(SOSC_DEVICE_CONNECTION, devs.info[i - 2]);
 				notified = 1;
