@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <dns_sd.h>
 #include <lo/lo.h>
 #include <monome.h>
 
@@ -43,6 +44,8 @@ typedef struct {
 	lo_address *outgoing;
 	lo_server *server;
 	int ipc_fd;
+
+	DNSServiceRef ref;
 
 	sosc_config_t config;
 } sosc_state_t;

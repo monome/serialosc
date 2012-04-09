@@ -27,6 +27,7 @@
 #endif
 
 #include <lo/lo.h>
+#include <dns_sd.h>
 #include <monome.h>
 
 #include "serialosc.h"

@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define _BSD_SOURCE
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -58,6 +60,10 @@ int main(int argc, char **argv)
 
 	if (!(device = monome_open(argv[1])))
 		return EXIT_FAILURE;
+
+#ifndef WIN32
+	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
+#endif
 
 	sosc_server_run(device);
 	monome_close(device);
