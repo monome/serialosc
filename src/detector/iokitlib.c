@@ -41,8 +41,9 @@ static void send_connect(const char *devnode)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_CONNECTION,
-		.connection = {.devnode = (char *) devnode}
 	};
+
+	msg.connection.devnode = (char *) devnode;
 
 	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }

@@ -15,6 +15,7 @@
  */
 
 #define _POSIX_SOURCE
+#define _C99_SOURCE /* OSX wants this for snprintf */
 
 #include <stdlib.h>
 #include <stdio.h>
