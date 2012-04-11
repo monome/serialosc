@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 	   least, because tools like ps peer inside the running executable
 	   image and use argv[0] as the command name. */
 
-	argv[0][strlen(argv[0]) - 1] = 0;
+	argv[0][strlen(argv[0]) - 1] = ' ';
 
 	if (!(device = monome_open(argv[1])))
 		return EXIT_FAILURE;
