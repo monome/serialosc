@@ -108,11 +108,10 @@ static void send_device_info(int fd, monome_t *monome)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_INFO,
-		.device_info = {
-			.serial = (char *) monome_get_serial(monome),
-			.friendly = (char *) monome_get_friendly_name(monome)
-		}
 	};
+
+	msg.device_info.serial = (char *) monome_get_serial(monome);
+	msg.device_info.friendly = (char *) monome_get_friendly_name(monome);
 
 	sosc_ipc_msg_write(fd, &msg);
 }
@@ -121,10 +120,9 @@ static void send_osc_port_change(int fd, uint16_t port)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_OSC_PORT_CHANGE,
-		.port_change = {
-			.port = port
-		}
 	};
+
+	msg.port_change.port = port;
 
 	sosc_ipc_msg_write(fd, &msg);
 }
