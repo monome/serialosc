@@ -26,8 +26,8 @@ all: serialoscd
 install: all
 	$(INSTALL) -d $(BINDIR)
 
-	echo "  INSTALL src/serialosc -> $(BINDIR)/serialosc"
-	$(INSTALL) serialosc $(BINDIR)/serialosc
+	echo "  INSTALL src/serialoscd -> $(BINDIR)/serialoscd"
+	$(INSTALL) serialoscd $(BINDIR)/serialoscd
 
 clean:
 	echo "  CLEAN   src"
