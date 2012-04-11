@@ -287,19 +287,16 @@ static void read_detector_msgs(const char *progname, int fd)
 			case SOSC_DEVICE_READY:
 				devs.info[i - 2]->ready = 1;
 
-				printf(" - new %s (%s)\n",
-					   devs.info[i - 2]->friendly, devs.info[i - 2]->serial);
+				fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
+						devs.info[i - 2]->serial, devs.info[i - 2]->port);
 
 				notify(SOSC_DEVICE_CONNECTION, devs.info[i - 2]);
 				notified = 1;
 				break;
 
 			case SOSC_DEVICE_DISCONNECTION:
-				printf(" - disconnection\n"
-				       "   - devinfo\n"
-					   "     - serial: %s\n"
-					   "     - friendly: %s\n",
-					  devs.info[i - 2]->serial, devs.info[i - 2]->friendly);
+				fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
+						devs.info[i - 2]->serial);
 
 				notify(SOSC_DEVICE_DISCONNECTION, devs.info[i - 2]);
 				notified = 1;
