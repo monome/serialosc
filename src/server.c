@@ -138,8 +138,20 @@ static void send_simple_ipc(int fd, sosc_ipc_type_t type)
 	sosc_ipc_msg_write(fd, &msg);
 }
 
+static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
+                   DNSServiceErrorType errorCode, const char *name,
+                   const char *regtype, const char *domain, void *context) {
+
+	/* on OSX, the bonjour library insists on having a callback passed to
+	   DNSServiceRegister. */
+
+	return;
+
+}
+
 void sosc_server_run(monome_t *monome)
 {
+	char *svc_name;
 	sosc_state_t state = {
 		.monome = monome,
 		.ipc_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
@@ -162,6 +174,33 @@ void sosc_server_run(monome_t *monome)
 			monome_get_serial(state.monome));
 		goto err_lo_addr;
 	}
+
+	svc_name = s_asprintf(
+		"%s (%s)", monome_get_friendly_name(state.monome),
+		monome_get_serial(state.monome));
+
+	if( !svc_name ) {
+		fprintf(
+			stderr, "serialosc [%s]: couldn't allocate memory, aieee!\n",
+			monome_get_serial(state.monome));
+		goto err_svc_name;
+	}
+
+	DNSServiceRegister(
+		/* sdref          */  &state.ref,
+		/* interfaceIndex */  0,
+		/* flags          */  0,
+		/* name           */  svc_name,
+		/* regtype        */  "_monome-osc._udp",
+		/* domain         */  NULL,
+		/* host           */  NULL,
+		/* port           */  htons(lo_server_get_port(state.server)),
+		/* txtLen         */  0,
+		/* txtRecord      */  NULL,
+		/* callBack       */  mdns_callback,
+		/* context        */  NULL);
+
+	free(svc_name);
 
 #define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
 	HANDLE(MONOME_BUTTON_DOWN, handle_press);
@@ -200,12 +239,15 @@ void sosc_server_run(monome_t *monome)
 	} else
 		send_simple_ipc(state.ipc_fd, SOSC_DEVICE_DISCONNECTION);
 
+	DNSServiceRefDeallocate(state.ref);
+
 	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't write config :(\n",
 			monome_get_serial(state.monome));
 	}
 
+err_svc_name:
 	lo_address_free(state.outgoing);
 err_lo_addr:
 	lo_server_free(state.server);
