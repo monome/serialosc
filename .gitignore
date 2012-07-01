@@ -1,9 +1,10 @@
-# compiled object files
-*.o
+# waf stuff
+.lock-waf*
+.waf*
 
-# vim temp files
-.*swp
+# build stuff
+build/
 
-# ./configure output
-config.mk
-.config.log
+# temporary stuff
+*.swp
+*~
