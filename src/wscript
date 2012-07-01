@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+
+top = ".."
+
+def build(bld):
+	# ".." includes the build directory (for config.h)
+	bld(export_includes=".. private", name="sosc_inc")
+
+	objs = []
+	obj = lambda src: objs.append(src)
+
+	#
+	# platform
+	#
+
+	if bld.env.DEST_OS[:3] == "win":
+		obj("platform/windows.c")
+		obj("detector/windows.c")
+		obj("event_loop/windows.c")
+
+	else:
+		obj("platform/posix.c")
+
+		if bld.env.DEST_OS == "linux":
+			obj("platform/linux.c")
+			obj("detector/libudev.c")
+
+		elif bld.env.DEST_OS == "darwin":
+			obj("platform/darwin.c")
+			obj("detector/iokitlib.c")
+
+		if bld.env.HAVE_WORKING_POLL:
+			obj("event_loop/poll.c")
+		else:
+			obj("event_loop/select.c")
+
+
+	#
+	# common
+	#
+	
+	obj("osc/mext_methods.c")
+	obj("osc/sys_methods.c")
+	obj("osc/util.c")
+
+	obj("util.c")
+	obj("server.c")
+	obj("config.c")
+	obj("serialosc.c")
+
+	bld.program(
+		source=objs,
+		use="sosc_inc libmonome LO UDEV CONFUSE LIBMONOME DNSSD",
+
+		target="serialosc")
