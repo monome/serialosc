@@ -196,3 +196,14 @@ def configure(conf):
 
 def build(bld):
 	bld.recurse("src")
+
+def dist(dst):
+	pats = [".git*", "**/.git*"]
+	with open(".gitignore") as gitignore:
+	    for l in gitignore.readlines():
+	        if l[0] == "#":
+	            continue
+
+	        pats.append(l.rstrip("\n"))
+
+	dst.excl = " ".join(pats)
