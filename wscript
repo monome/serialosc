@@ -94,9 +94,27 @@ def check_libmonome(conf):
 		execute=True,
 
 		lib="monome",
+		header_name="monome.h",
 		uselib_store="LIBMONOME",
 
 		msg="Checking for libmonome")
+
+
+def check_dnssd_win(conf):
+	conf.check_cc(
+		define_name="HAVE_DNSSD",
+		mandatory=True,
+		quote=0,
+
+		execute=True,
+
+		lib="dnssd",
+		header_name="dns_sd.h",
+		libpath=["c:/windows/system32"],
+		includes=["c:/program files/bonjour sdk/include"],
+		uselib_store="DNSSD",
+
+		msg="Checking for dnssd")
 
 def check_dnssd(conf):
 	conf.check_cc(
@@ -106,7 +124,8 @@ def check_dnssd(conf):
 
 		execute=True,
 
-		lib="dnssd" if conf.env.DEST_OS[:3] == "win" else "dns_sd",
+		lib="dns_sd",
+		header_name="dns_sd.h",
 		uselib_store="DNSSD",
 
 		msg="Checking for dnssd")
@@ -133,13 +152,17 @@ def configure(conf):
 	conf.load("compiler_c")
 	conf.load("gnu_dirs")
 
+	if conf.env.DEST_OS == "win32":
+		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
+		conf.env.append_unique("CFLAGS", conf.env.CPPPATH_ST % conf.env.INCLUDEDIR)
+
 	#
 	# conf checks
 	#
 
 	separator()
 
-	if conf.env.DEST_OS[:3] != "win":
+	if conf.env.DEST_OS != "win32":
 		check_poll(conf)
 
 	if conf.env.DEST_OS == "linux":
@@ -149,7 +172,9 @@ def configure(conf):
 	check_liblo(conf)
 	check_confuse(conf)
 
-	if conf.env.DEST_OS != "darwin":
+	if conf.env.DEST_OS == "win32":
+		check_dnssd_win(conf)
+	elif conf.env.DEST_OS != "darwin":
 		check_dnssd(conf)
 
 	separator()
@@ -160,6 +185,12 @@ def configure(conf):
 
 	if conf.options.enable_multilib:
 		conf.env.ARCH = ["i386", "x86_64"]
+
+	if conf.env.DEST_OS == "win32":
+		conf.define("WIN32", 1)
+		conf.env.append_unique("LIB_LO", "ws2_32")
+		conf.env.append_unique("LIB_CONFUSE", "intl")
+		conf.env.append_unique("LINKFLAGS", ["-Wl,--enable-stdcall-fixup"])
 
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
