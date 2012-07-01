@@ -3,8 +3,7 @@
 top = ".."
 
 def build(bld):
-	# ".." includes the build directory (for config.h)
-	bld(export_includes=".. private", name="sosc_inc")
+	bld(export_includes="private", name="sosc_inc")
 
 	objs = []
 	obj = lambda src: objs.append(src)
@@ -48,8 +47,17 @@ def build(bld):
 	obj("config.c")
 	obj("serialosc.c")
 
-	bld.program(
-		source=objs,
-		use="sosc_inc libmonome LO UDEV CONFUSE LIBMONOME DNSSD",
+	if bld.env.DEST_OS == "darwin":
+		bld.program(
+			source=objs,
+			target="serialosc",
 
-		target="serialosc")
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME",
+			framework=["IOKit", "CoreFoundation"])
+
+	else:
+		bld.program(
+			source=objs,
+			target="serialosc",
+
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD")

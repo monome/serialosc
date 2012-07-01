@@ -148,7 +148,9 @@ def configure(conf):
 	check_libmonome(conf)
 	check_liblo(conf)
 	check_confuse(conf)
-	check_dnssd(conf)
+
+	if conf.env.DEST_OS != "darwin":
+		check_dnssd(conf)
 
 	separator()
 
