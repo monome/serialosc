@@ -70,12 +70,10 @@ static int spawn_server(const char *devnode) {
 
 int scan_connected_devices() {
 	HKEY key, subkey;
-	char subkey_name[MAX_PATH], *subkey_path, *serial;
+	char subkey_name[MAX_PATH], *subkey_path;
 	unsigned char port_name[64];
 	DWORD klen, plen, ptype;
 	int i = 0;
-
-	serial = NULL;
 
 	switch( RegOpenKeyEx(
 			HKEY_LOCAL_MACHINE, FTDI_REG_PATH,
