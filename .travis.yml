@@ -6,6 +6,6 @@ before_install:
   - sudo apt-get update
   - sudo apt-get install liblo-dev libudev-dev libconfuse-dev libavahi-compat-libdnssd-dev
   - git clone git://github.com/monome/libmonome.git
-  - cd libmonome && ./waf configure && ./waf && sudo ./waf install
+  - cd libmonome && ./waf configure && ./waf && sudo ./waf install; cd ..
 
 script: ./waf configure && ./waf
