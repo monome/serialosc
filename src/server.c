@@ -173,7 +173,6 @@ void server_run(monome_t *monome) {
 
 	monome_set_rotation(state.monome, state.config.dev.rotation);
 	monome_led_all(state.monome, 0);
-	monome_mode(state.monome, MONOME_MODE_NORMAL);
 
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
