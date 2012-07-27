@@ -78,5 +78,6 @@ int sosc_event_loop(const sosc_state_t *state) {
 		}
 	} while ( 1 );
 
+	((void) lo_thd_res); /* shut GCC up about this being an unused variable */
 	return 0;
 }
