@@ -124,12 +124,6 @@ OSC_HANDLER_FUNC(sys_info_handler_default) {
 /**/
  
 
-OSC_HANDLER_FUNC(sys_mode_handler) {
-	monome_t *monome = user_data;
-
-	return monome_mode(monome, argv[0]->i);
-}
-
 OSC_HANDLER_FUNC(sys_cable_legacy_handler) {
 	sosc_state_t *state = user_data;
 	monome_rotate_t new, old;
@@ -275,9 +269,6 @@ void osc_register_sys_methods(sosc_state_t *state) {
 		REGISTER("i", sys_info_handler, state);
 		REGISTER("", sys_info_handler_default, state);
 	}
-
-	METHOD("mode")
-		REGISTER("i", sys_mode_handler, state->monome);
 
 	METHOD("cable")
 		REGISTER("s", sys_cable_legacy_handler, state);
