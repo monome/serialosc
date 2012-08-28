@@ -308,8 +308,9 @@ static void read_detector_msgs(const char *progname, int fd)
 				s_free(devs.info[i - 2]);
 
 				/* shift everything in the array down by one */
-				memmove(&fds[i], &fds[i + 1], devs.count - i + 1);
-				memmove(&devs.info[i - 2], &devs.info[i - 1], devs.count - i + 1);
+				memmove(&fds[i], &fds[i + 1], (devs.count - i + 1) * sizeof(*fds));
+				memmove(&devs.info[i - 2], &devs.info[i - 1],
+						(devs.count - i + 1) * sizeof(*devs.info));
 				devs.count--;
 
 				/* and since fds[i + 1] has become fds[i], we'll
