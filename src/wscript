@@ -29,7 +29,7 @@ def build(bld):
 			obj("platform/darwin.c")
 			obj("detector/iokitlib.c")
 
-		if bld.env.HAVE_WORKING_POLL:
+		if bld.is_defined("HAVE_WORKING_POLL"):
 			obj("event_loop/poll.c")
 		else:
 			obj("event_loop/select.c")
