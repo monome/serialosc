@@ -136,7 +136,6 @@ def check_dnssd(conf):
 
 def options(opt):
 	opt.load("compiler_c")
-	opt.load("cython")
 
 	sosc_opts = opt.add_option_group("serialosc options")
 
