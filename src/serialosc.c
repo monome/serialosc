@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
 #endif
 
+	sosc_zeroconf_init();
 	server_run(device);
 	monome_close(device);
 

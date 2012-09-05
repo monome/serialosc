@@ -37,7 +37,9 @@ def build(bld):
 	#
 	# common
 	#
-	
+
+	obj("zeroconf/common.c")
+
 	obj("osc/mext_methods.c")
 	obj("osc/sys_methods.c")
 	obj("osc/util.c")

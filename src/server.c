@@ -102,17 +102,6 @@ static void send_connection_status(sosc_state_t *state, int status) {
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "");
 }
 
-static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
-                   DNSServiceErrorType errorCode, const char *name,
-                   const char *regtype, const char *domain, void *context) {
-
-	/* on OSX, the bonjour library insists on having a callback passed to
-	   DNSServiceRegister. */
-
-	return;
-
-}
-
 void server_run(monome_t *monome) {
 	sosc_state_t state = { .monome = monome };
 	char *svc_name;
@@ -146,20 +135,7 @@ void server_run(monome_t *monome) {
 		goto err_svc_name;
 	}
 
-	DNSServiceRegister(
-		/* sdref          */  &state.ref,
-		/* interfaceIndex */  0,
-		/* flags          */  0,
-		/* name           */  svc_name,
-		/* regtype        */  "_monome-osc._udp",
-		/* domain         */  NULL,
-		/* host           */  NULL,
-		/* port           */  htons(lo_server_get_port(state.server)),
-		/* txtLen         */  0,
-		/* txtRecord      */  NULL,
-		/* callBack       */  mdns_callback,
-		/* context        */  NULL);
-
+	sosc_zeroconf_register(&state, svc_name);
 	free(svc_name);
 
 #define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
@@ -181,13 +157,14 @@ void server_run(monome_t *monome) {
 	        monome_get_serial(state.monome), lo_server_get_port(state.server));
 
 	send_connection_status(&state, 1);
+
 	event_loop(&state);
+
 	send_connection_status(&state, 0);
+	sosc_zeroconf_unregister(&state);
 
 	fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
 	        monome_get_serial(state.monome));
-
-	DNSServiceRefDeallocate(state.ref);
 
 	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
 		fprintf(
