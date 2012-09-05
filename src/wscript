@@ -16,6 +16,7 @@ def build(bld):
 		obj("platform/windows.c")
 		obj("detector/windows.c")
 		obj("event_loop/windows.c")
+		obj("zeroconf/windows.c")
 
 	else:
 		obj("platform/posix.c")
@@ -64,4 +65,4 @@ def build(bld):
 			source=objs,
 			target="serialosc",
 
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME DL")
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD_INC DL")

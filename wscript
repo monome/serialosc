@@ -102,27 +102,15 @@ def check_libmonome(conf):
 
 def check_dnssd_win(conf):
 	conf.check_cc(
-		define_name="HAVE_DNSSD",
 		mandatory=True,
-		quote=0,
-
-		execute=True,
-
-		lib="dnssd",
 		header_name="dns_sd.h",
-		libpath=["c:/windows/system32"],
 		includes=["c:/program files/bonjour sdk/include"],
-		uselib_store="DNSSD",
+		uselib_store="DNSSD_INC")
 
-		msg="Checking for dnssd")
 
 def check_dnssd(conf):
 	conf.check_cc(
 		mandatory=True,
-		quote=0,
-
-		execute=True,
-
 		header_name="dns_sd.h")
 
 #

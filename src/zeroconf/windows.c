@@ -14,42 +14,33 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <dlfcn.h>
 #include <stdio.h>
+
+#include <Windows.h>
+#include <dns_sd.h>
 
 #include "serialosc.h"
 #include "zeroconf.h"
 
-union reg_func {
-	dnssd_registration_func_t fptr;
-	void *vptr;
-};
-
-union dealloc_func {
-	dnssd_deallocation_func_t fptr;
-	void *vptr;
-};
-
 void sosc_zeroconf_init()
 {
-	union dealloc_func dfunc;
-	union reg_func rfunc;
-	void *ldnssd;
+	FARPROC rfunc, dfunc;
+	HMODULE ldnssd;
 
-	if (!(ldnssd = dlopen("libdns_sd.so", RTLD_LAZY))) {
-		fprintf(stderr, "sosc_zeroconf_init(): couldn't load libdns_sd.so\n");
+	if (!(ldnssd = LoadLibrary("dnssd.dll"))) {
+		fprintf(stderr, "sosc_zeroconf_init(): couldn't load dnssd.dll\n");
 		return;
 	}
 
-	rfunc.vptr = dlsym(ldnssd, "DNSServiceRegister");
-	dfunc.vptr = dlsym(ldnssd, "DNSServiceRefDeallocate");
+	rfunc = GetProcAddress(ldnssd, "DNSServiceRegister");
+	dfunc = GetProcAddress(ldnssd, "DNSServiceRefDeallocate");
 
-	if (!rfunc.vptr || !dfunc.vptr) {
-		fprintf(stderr, "sosc_zeroconf_init(): couldn't resolve symbols in libdns_sd.so\n");
-		dlclose(ldnssd);
+	if (!rfunc || !dfunc) {
+		fprintf(stderr, "sosc_zeroconf_init(): couldn't resolve symbols in dnssd.dll\n");
+		FreeLibrary(ldnssd);
 		return;
 	}
 
-	sosc_dnssd_registration_func = rfunc.fptr;
-	sosc_dnssd_deallocation_func = dfunc.fptr;
+	sosc_dnssd_registration_func = (dnssd_registration_func_t) rfunc;
+	sosc_dnssd_deallocation_func = (dnssd_deallocation_func_t) dfunc;
 }
