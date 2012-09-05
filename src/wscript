@@ -64,4 +64,4 @@ def build(bld):
 			source=objs,
 			target="serialosc",
 
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD DL")
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME DL")
