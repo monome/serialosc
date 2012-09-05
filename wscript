@@ -176,6 +176,7 @@ def configure(conf):
 		check_dnssd_win(conf)
 	elif conf.env.DEST_OS != "darwin":
 		check_dnssd(conf)
+		conf.check_cc(lib='dl', uselib_store='DL', mandatory=True)
 
 	separator()
 

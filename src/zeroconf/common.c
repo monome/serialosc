@@ -20,6 +20,9 @@
 #include "serialosc.h"
 #include "zeroconf.h"
 
+dnssd_registration_func_t sosc_dnssd_registration_func = NULL;
+dnssd_deallocation_func_t sosc_dnssd_deallocation_func = NULL;
+
 static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
                    DNSServiceErrorType errorCode, const char *name,
                    const char *regtype, const char *domain, void *context) {
@@ -28,12 +31,6 @@ static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
 	   DNSServiceRegister. */
 
 	return;
-}
-
-void sosc_zeroconf_init()
-{
-	sosc_dnssd_registration_func = DNSServiceRegister;
-	sosc_dnssd_deallocation_func = DNSServiceRefDeallocate;
 }
 
 void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)

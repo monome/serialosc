@@ -36,5 +36,6 @@ typedef DNSServiceErrorType (DNSSD_API *dnssd_registration_func_t)
 
 typedef void (DNSSD_API *dnssd_deallocation_func_t)(DNSServiceRef sdRef);
 
-dnssd_registration_func_t sosc_dnssd_registration_func = NULL;
-dnssd_deallocation_func_t sosc_dnssd_deallocation_func = NULL;
+/* declared in src/zeroconf/common.c */
+extern dnssd_registration_func_t sosc_dnssd_registration_func;
+extern dnssd_deallocation_func_t sosc_dnssd_deallocation_func;
