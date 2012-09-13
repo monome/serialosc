@@ -21,7 +21,7 @@
 #include "serialosc.h"
 #include "ipc.h"
 
-#define IPC_MAGIC 0x505C
+#define IPC_MAGIC 0x505C /* SOSC, get it? */
 
 static int read_strdata(int fd, size_t n, ...)
 {
@@ -38,7 +38,7 @@ static int read_strdata(int fd, size_t n, ...)
 		*cur = NULL;
 
 		read(fd, &slen, sizeof(slen));
-		if (!(buf = s_calloc(slen, sizeof(char)))) {
+		if (!(buf = s_calloc(slen + 1, sizeof(char)))) {
 			/* XXX: proper error handling? i.e. what do we do with the 
 			        strings that are already allocated? we can't NULL
 			        all of them at the start, I guess that's up to the
