@@ -16,7 +16,14 @@
 
 #include <stdint.h>
 
+#ifndef PACKED
 #define PACKED __attribute__((__packed__))
+#endif
+
+#ifdef WIN32
+#define SOSC_PIPE_PREFIX "\\\\.\\pipe\\org.monome.serialosc-"
+#define SOSC_DETECTOR_PIPE (SOSC_PIPE_PREFIX "detector")
+#endif
 
 typedef enum {
 	SOSC_DEVICE_CONNECTION,

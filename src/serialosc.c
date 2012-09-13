@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include <monome.h>
 #include "serialosc.h"
@@ -26,17 +27,26 @@ int main(int argc, char **argv)
 {
 	monome_t *device;
 
-	/* this file is the main entry-point for serialosc. here, we devide
+	/* this file is the main entry-point for serialosc. here, we decide
 	   whether we're running as serialoscd or as one of the per-device
 	   OSC servers.
 
 	   to run as a per-device OSC server, we expect argv[1] to be a path
 	   to a monome tty/COM port. */
 
+#ifdef WIN32
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+#endif
+
 	if (argc < 2) {
 		/* if we're missing that argument, run as the "supervisor" process,
 		   which goes on to spawn the monitor, and in turn the individual
 		   device processes.
+
+		   except on windows, where the "detector" process and the
+		   "supervisor" process are the same, and we need to run the
+		   detector from here.
 
 		   this process will run as "serialoscd", and the monitor runs
 		   as "serialoscm".
@@ -44,10 +54,17 @@ int main(int argc, char **argv)
 		   XXX: add some sort of lock file to prevent two manager
 		        instances from running at the same time. */
 
+#ifndef WIN32
 		if (sosc_supervisor_run(argv[0]))
 			return EXIT_FAILURE;
 		else
 			return EXIT_SUCCESS;
+#else
+		if (sosc_detector_run(argv[0]))
+			return EXIT_FAILURE;
+		else
+			return EXIT_SUCCESS;
+#endif
 	}
 
 	/* otherwise, we'll run as a per-device server. this next odd line

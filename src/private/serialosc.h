@@ -23,6 +23,8 @@
 
 #include "platform.h"
 
+#define SOSC_WIN_SERVICE_NAME "serialosc"
+
 typedef struct {
 	struct {
 		char port[6];

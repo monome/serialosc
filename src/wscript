@@ -15,6 +15,7 @@ def build(bld):
 	if bld.env.DEST_OS[:3] == "win":
 		obj("platform/windows.c")
 		obj("detector/windows.c")
+		obj("supervisor/windows.c")
 		obj("event_loop/windows.c")
 
 	else:
