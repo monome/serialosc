@@ -50,10 +50,14 @@ struct detector_state state = {
 	}
 };
 
-static int spawn_server(const char *devnode)
+static void send_connect(const char *devnode)
 {
-	fprintf(stderr, "spawning process for %s\n", devnode);
-	return 0;
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_CONNECTION,
+		.connection = {.devnode = (char *) devnode}
+	};
+
+	sosc_ipc_msg_write(state.pipe_to_supervisor, &msg);
 }
 
 int scan_connected_devices()
@@ -118,7 +122,7 @@ int scan_connected_devices()
 			goto next;
 		}
 
-		spawn_server((char *) port_name);
+		send_connect((char *) port_name);
 
 next:
 		RegCloseKey(subkey);
@@ -200,7 +204,7 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
 			wcstombs(devname, (wchar_t *) dev->dbcc_name, sizeof(devname));
 			port = ftdishit_to_port(devname);
 
-			spawn_server(port);
+			send_connect(port);
 
 			s_free(port);
 			break;
@@ -265,48 +269,43 @@ err_rdnotification:
 
 static int open_pipe_to_supervisor()
 {
-	HANDLE p;
+	HANDLE p = NULL;
 
-	if (!WaitNamedPipe(SOSC_DETECTOR_PIPE, 1000)) {
-		fprintf(stderr, "detector: no supervisor pipe available\n");
-		return 1;
-	}
+	do {
+		p = CreateFile(
+			SOSC_DETECTOR_PIPE,
+			GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
 
-	p = CreateFile(
-		SOSC_DETECTOR_PIPE,
-		GENERIC_WRITE,
-		0,
-		NULL,
-		OPEN_EXISTING,
-		0,
-		NULL);
+		if (p != INVALID_HANDLE_VALUE)
+			break;
+			
+		switch (GetLastError()) {
+		case ERROR_FILE_NOT_FOUND:
+			Sleep(100);
+			continue;
 
-	if (p == INVALID_HANDLE_VALUE)
-		return 1;
+		default:
+			return 1;
+		}
+	} while (1);
 
 	state.pipe_to_supervisor = _open_osfhandle((intptr_t) p, 0);
 
 	return 0;
 }
 
-static void fuck()
-{
-	char buf[] = "fuck shit stack";
-
-	if (write(state.pipe_to_supervisor, buf, sizeof(buf)) < sizeof(buf))
-		fprintf(stderr, "[-] ffffffuck\n");
-}
-
 static DWORD WINAPI detector_thread(LPVOID param)
 {
-	Sleep(250);
-
 	if (open_pipe_to_supervisor())
 		fprintf(stderr, "[-] couldn't open pipe to supervisor\n");
 	else
 		fprintf(stderr, "[+] opened supervisor pipe\n");
 
-	fuck();
 	scan_connected_devices();
 	return 0;
 }
@@ -320,6 +319,8 @@ void debug_main()
 
 	if (sosc_supervisor_run(NULL))
 		fprintf(stderr, "[-] supervisor returned unexpectedly\n");
+
+	Sleep(500);
 }
 
 int sosc_detector_run(const char *exec_path)

@@ -22,6 +22,7 @@
 #include <process.h>
 #include <Winreg.h>
 #include <Dbt.h>
+#include <io.h>
 
 /* damnit mingw */
 #ifndef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
@@ -176,7 +177,7 @@ void pipe_read(HANDLE pipe)
 int overlapped_connect_pipe(HANDLE p)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
-	DWORD what;
+	DWORD what, err;
 
 	if (!(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL))) {
 		fprintf(stderr,
@@ -186,17 +187,55 @@ int overlapped_connect_pipe(HANDLE p)
 	}
 
 	if (!ConnectNamedPipe(p, &ov)) {
-		if (GetLastError() != ERROR_IO_PENDING) {
-			fprintf(stderr, "overlapped_connect_pipe(): write failed (%ld)\n",
-					GetLastError());
+		switch ((err = GetLastError())) {
+		case ERROR_PIPE_CONNECTED:
+			what = 0;
+			goto done;
+
+		case ERROR_IO_PENDING:
+			break;
+
+		default:
+			fprintf(stderr, "overlapped_connect_pipe(): connect failed (%ld)\n",
+					err);
 			return -1;
 		}
 
 		GetOverlappedResult(p, &ov, &what, TRUE);
 	}
 
+done:
 	CloseHandle(ov.hEvent);
 	return what;
+}
+
+void read_ipc_msg_from(int fd)
+{
+	int fff;
+	sosc_ipc_msg_t msg;
+	fff = sosc_ipc_msg_read(fd, &msg);
+
+	if (fff > 0)
+		printf("[+] read %d bytes\n", fff);
+	else {
+		printf("[-] read %d bytes\n", fff);
+		return;
+	}
+
+	switch (msg.type) {
+	case SOSC_DEVICE_CONNECTION:
+		fprintf(stderr, "connection, port %s\n", msg.connection.devnode);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void fuck()
+{
+	int fd = _open_osfhandle((intptr_t) state.detector_pipe, 0);
+	read_ipc_msg_from(fd);
 }
 
 int sosc_supervisor_run(char *progname)
@@ -216,7 +255,7 @@ int sosc_supervisor_run(char *progname)
 		goto err_reaper;
 
 	overlapped_connect_pipe(state.detector_pipe);
-	pipe_read(state.detector_pipe);
+	fuck();
 	return 0;
 
 err_reaper:
