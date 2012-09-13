@@ -146,8 +146,8 @@ static int init_detector_pipe()
 		PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
 		PIPE_TYPE_MESSAGE,
 		1,
-		32,
-		32,
+		64,
+		64,
 		0,
 		NULL);
 
@@ -209,17 +209,26 @@ done:
 	return what;
 }
 
-void read_ipc_msg_from(int fd)
+int read_ipc_msg_from(int fd)
 {
-	int fff;
 	sosc_ipc_msg_t msg;
-	fff = sosc_ipc_msg_read(fd, &msg);
+	DWORD available;
+	ssize_t nbytes;
+	HANDLE h;
 
-	if (fff > 0)
-		printf("[+] read %d bytes\n", fff);
+	h = (HANDLE) _get_osfhandle(fd);
+	((void) h);
+
+	if (!PeekNamedPipe(h, NULL, 0, NULL, &available, NULL) || !available)
+		return 0;
+
+	nbytes = sosc_ipc_msg_read(fd, &msg);
+
+	if (nbytes > 0)
+		printf("[+] read %d bytes\n", nbytes);
 	else {
-		printf("[-] read %d bytes\n", fff);
-		return;
+		printf("[-] read %d bytes\n", nbytes);
+		return -1;
 	}
 
 	switch (msg.type) {
@@ -230,12 +239,15 @@ void read_ipc_msg_from(int fd)
 	default:
 		break;
 	}
+
+	return nbytes;
 }
 
 void fuck()
 {
 	int fd = _open_osfhandle((intptr_t) state.detector_pipe, 0);
-	read_ipc_msg_from(fd);
+	Sleep(250);
+	while (read_ipc_msg_from(fd));
 }
 
 int sosc_supervisor_run(char *progname)
