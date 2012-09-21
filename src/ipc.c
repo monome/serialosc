@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "serialosc.h"
 #include "ipc.h"
@@ -142,7 +143,7 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 	return nbytes;
 }
 
-static int strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
+static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 {
 	const char **cur;
 	uint16_t magic;
@@ -160,28 +161,40 @@ static int strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 			return 1;    \
 	} while (0);
 
+#define CONSUME_BYTES(nb)     \
+	({                        \
+		uint8_t *obuf = buf;  \
+		BUF_WALK(nb);         \
+		obuf;                 \
+	})
+
+#define CONSUME_TYPE(type)           \
+	*((type *) ({                    \
+		CONSUME_BYTES(sizeof(type)); \
+	}))
+
 	while (n--) {
 		cur = va_arg(ap, const char **);
 		*cur = NULL;
 
-		slen = *((size_t *) buf);
+		slen  = CONSUME_TYPE(size_t);
+		*cur  = (char *) CONSUME_BYTES(slen);
+		magic = CONSUME_TYPE(uint16_t);
 
-		BUF_WALK(sizeof(slen));
-		*cur = (const char *) buf;
-
-		BUF_WALK(slen);
-		magic = *((uint16_t *) buf);
 		if (magic != IPC_MAGIC) {
 			*cur = NULL;
 			return 1;
 		}
 
 		/* null-terminate the string (this is a little hack) */
-		*buf = '\0';
-		BUF_WALK(magic);
+		*(buf - 2) = '\0';
 	}
 
 	va_end(ap);
+
+#undef CONSUME_TYPE
+#undef CONSUME_BYTES
+#undef BUF_WALK
 
 	return 0;
 
