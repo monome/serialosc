@@ -14,10 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <assert.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "serialosc.h"
 #include "ipc.h"
@@ -143,6 +143,52 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 	return nbytes;
 }
 
+static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
+{
+	uint16_t magic = IPC_MAGIC;
+	const char *cur;
+	ssize_t avail;
+	size_t slen;
+	va_list ap;
+
+#define BUF_WALK(bytes)  \
+	do {                 \
+		buf += bytes;    \
+		nbytes -= bytes; \
+		                 \
+		if (nbytes < 0)  \
+			return -1;   \
+	} while (0)
+
+#define EMIT_BYTES(b, nb)    \
+	({                       \
+		uint8_t *obuf = buf; \
+		BUF_WALK(nb);        \
+		memcpy(obuf, b, nb); \
+	})
+
+#define EMIT_VAR(v) EMIT_BYTES(&v, sizeof(v))
+
+	avail = nbytes;
+
+	va_start(ap, n);
+	while (n--) {
+		cur = va_arg(ap, const char *);
+		slen = strlen(cur);
+
+		EMIT_VAR(slen);
+		EMIT_BYTES(cur, slen);
+		EMIT_VAR(magic);
+	}
+	va_end(ap);
+
+#undef EMIT_VAR
+#undef EMIT_BYTES
+#undef BUF_WALK
+
+	return avail - nbytes;
+}
+
 static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 {
 	const char **cur;
@@ -158,8 +204,8 @@ static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 		nbytes -= bytes; \
 		                 \
 		if (nbytes < 0)  \
-			return 1;    \
-	} while (0);
+			return -1;   \
+	} while (0)
 
 #define CONSUME_BYTES(nb)     \
 	({                        \
@@ -198,6 +244,46 @@ static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 
 	return 0;
 
+}
+
+ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
+{
+	ssize_t avail, strbytes;
+
+	if (nbytes < sizeof(*msg))
+		return -1;
+
+	avail = nbytes;
+
+	msg->magic = IPC_MAGIC;
+	memcpy(buf, msg, sizeof(*msg));
+
+	nbytes -= sizeof(*msg);
+	buf += sizeof(*msg);
+
+	switch (msg->type) {
+	case SOSC_DEVICE_CONNECTION:
+		strbytes = strdata_to_buf(buf, nbytes, 1, msg->connection.devnode);
+
+		if (strbytes < 0)
+			return -1;
+		break;
+
+	case SOSC_DEVICE_INFO:
+		strbytes = strdata_to_buf(buf, nbytes, 2, msg->device_info.serial,
+								  msg->device_info.friendly);
+
+		if (strbytes < 0)
+			return -1;
+	default:
+		strbytes = 0;
+		break;
+	}
+
+	nbytes -= strbytes;
+	assert(nbytes >= 0);
+
+	return avail - nbytes;
 }
 
 int sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)

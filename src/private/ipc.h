@@ -56,4 +56,6 @@ typedef struct {
 
 int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg);
 int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf);
+
+ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg);
 int sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg);
