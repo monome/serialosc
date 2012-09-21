@@ -29,18 +29,56 @@
 #define JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 0x00002000
 #endif
 
+#define ARRAY_LENGTH(x)  (sizeof(x) / sizeof(*x))
+
+#define PIPE_BUF         64
+#define SOSC_DEVICE_PIPE (SOSC_PIPE_PREFIX "devices")
+
+#define MAX_DEVICES      32
+#define DETECTOR_EVENT   (MAX_DEVICES)
+#define OSC_EVENT        (MAX_DEVICES + 1)
+#define EVENT_COUNT      (MAX_DEVICES + 2) /* 1 for osc, 1 for detector */
+
 #include "serialosc.h"
 #include "ipc.h"
 
+struct device_info {
+	uint16_t port;
+	char *serial;
+	char *friendly;
+};
+
+struct incoming_pipe {
+	OVERLAPPED ov;
+	HANDLE pipe;
+
+	struct {
+		char buf[PIPE_BUF];
+		DWORD nbytes;
+	} read;
+
+	enum {
+		UNCONNECTED,
+		NOT_READY,
+		READY
+	} status;
+
+	struct device_info info;
+};
+
 struct supervisor_state {
 	HANDLE reaper_job;
-	HANDLE detector_pipe;
+	struct incoming_pipe detector;
 
 	char *exec_path;
 	const char *quoted_exec_path;
 };
 
 struct supervisor_state state;
+
+/*************************************************************************
+ * overlapped i/o helpers
+ *************************************************************************/
 
 static ssize_t overlapped_read(HANDLE h, uint8_t *buf, size_t nbyte)
 {
@@ -68,6 +106,29 @@ static ssize_t overlapped_read(HANDLE h, uint8_t *buf, size_t nbyte)
 	return read;
 }
 
+static int overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
+{
+	DWORD err;
+
+	if (!ConnectNamedPipe(p, ov)) {
+		switch ((err = GetLastError())) {
+		case ERROR_PIPE_CONNECTED:
+			SetEvent(ov->hEvent);
+			return 1;
+
+		case ERROR_IO_PENDING:
+			break;
+
+		default:
+			fprintf(stderr, "overlapped_connect_pipe(): connect failed (%ld)\n",
+					err);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 int spawn_server(const char *devnode) {
 	intptr_t proc;
 
@@ -84,19 +145,324 @@ int spawn_server(const char *devnode) {
 	return 0;
 }
 
+int pipe_read(HANDLE pipe)
+{
+	sosc_ipc_msg_t *msg;
+	char buf[PIPE_BUF];
+	ssize_t read;
+
+	read = overlapped_read(pipe, (uint8_t *) buf, sizeof(buf));
+
+	if (read <= 0) {
+		fprintf(stderr, "[-] read failed\n");
+		return read;
+	}
+
+	fprintf(stderr, "[+] read %d bytes\n", read);
+	if (sosc_ipc_msg_from_buf((uint8_t *) buf, read, &msg))
+		fprintf(stderr, "[-] bad message\n");
+
+	switch (msg->type) {
+	case SOSC_DEVICE_CONNECTION:
+		fprintf(stderr, "connection, port %s\n", msg->connection.devnode);
+		break;
+
+	case SOSC_DEVICE_INFO:
+		fprintf(stderr, "info\n");
+		break;
+
+	default:
+		break;
+	}
+
+	return read;
+}
+
+/*************************************************************************
+ * osc stuff
+ *************************************************************************/
+
+HANDLE events[EVENT_COUNT];
+struct incoming_pipe pipe_info[MAX_DEVICES] = {
+	[0 ... (MAX_DEVICES - 1)] = {
+		.ov     = {0, 0, {{0, 0}}},
+		.status = UNCONNECTED,
+		.info   = {
+			.port   = 0,
+			.serial = NULL,
+			.friendly = NULL
+		}
+	}
+};
+
+/*************************************************************************
+ * supervisor read loop
+ *************************************************************************/
+
+static int handle_read(struct incoming_pipe *p)
+{
+	sosc_ipc_msg_t *msg;
+
+	fprintf(stderr, "[+] read complete, got %d bytes\n", p->read.nbytes);
+
+	if (sosc_ipc_msg_from_buf((uint8_t *) p->read.buf, p->read.nbytes, &msg)) {
+		fprintf(stderr, "[-] bad message\n");
+		return -1;
+	}
+
+	switch (msg->type) {
+	case SOSC_DEVICE_CONNECTION:
+		fprintf(stderr, "connection, port %s\n", msg->connection.devnode);
+		break;
+
+	case SOSC_DEVICE_INFO:
+		fprintf(stderr, "info\n");
+		break;
+
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int handle_pipe(struct incoming_pipe *p)
+{
+	int res;
+
+	res = GetOverlappedResult(p->pipe, &p->ov, &p->read.nbytes, FALSE);
+
+	switch (p->status) {
+	case UNCONNECTED:
+		if (!res)
+			return -1;
+
+		p->status = NOT_READY;
+		break;
+
+	case NOT_READY:
+	case READY:
+		if (!res || !p->read.nbytes) {
+			/* disconnect, reconnect */
+			return 0;
+		}
+
+		handle_read(p);
+
+		break;
+	}
+
+	fprintf(stderr, "[+] queueing a read...\n");
+
+queue_read:
+	res = ReadFile(
+		p->pipe,
+		p->read.buf,
+		sizeof(p->read.buf),
+		&p->read.nbytes,
+		&p->ov);
+
+	if (res && p->read.nbytes > 0) {
+		fprintf(stderr, "[!] immediate return\n");
+		handle_read(p);
+		goto queue_read;
+	}
+
+	if (!res) {
+		switch ((res = GetLastError())) {
+		case ERROR_IO_PENDING:
+			return 0;
+
+		default:
+			fprintf(stderr, "supervisor: handle_pipe(): error %ld\n", res);
+			return -1;
+		}
+	}
+
+	/* disconnect, reconnect? */
+	return 0;
+}
+
+static void read_loop()
+{
+	int which;
+
+	Sleep(100);
+
+	fprintf(stderr, "\n[+] supervisor: read_loop() start\n");
+
+	for (;;) {
+		which = WaitForMultipleObjects(
+			EVENT_COUNT,
+			events,
+			FALSE,
+			INFINITE);
+
+		if (which == WAIT_FAILED) {
+			fprintf(stderr,
+				"supervisor: read_loop(): WaitForMultipleObjects failed (%ld)\n",
+				GetLastError());
+			return;
+		}
+
+		which -= WAIT_OBJECT_0;
+		fprintf(stderr, "[!] object %d ready\n", which);
+
+		switch (which) {
+		case DETECTOR_EVENT:
+			if (handle_pipe(&state.detector))
+				fprintf(stderr,
+					"supervisor: read_loop(): failure in handle_pipe "
+					"(detector pipe: %ld)\n", GetLastError());
+			break;
+
+		case OSC_EVENT:
+			break;
+
+		default:
+			if (handle_pipe(&pipe_info[which]))
+				fprintf(stderr,
+					"supervisor: read_loop(): failure in handle_pipe "
+					"(device pipe %d: %ld)\n", which, GetLastError());
+			break;
+		}
+	}
+}
+
+/*************************************************************************
+ * pipe initialization
+ *************************************************************************/
+
+static int init_device_events()
+{
+	struct incoming_pipe *p;
+	int i;
+
+	for (i = 0; i < MAX_DEVICES; i++) {
+		p = &pipe_info[i];
+
+		if (!(events[i] = CreateEvent(NULL, TRUE, TRUE, NULL))) {
+			fprintf(stderr, "supervisor: couldn't allocate event %d\n", i);
+			return -1;
+		}
+
+		p->ov.hEvent = events[i];
+
+		p->pipe = CreateNamedPipe(
+			SOSC_DEVICE_PIPE,
+			PIPE_ACCESS_INBOUND
+				| FILE_FLAG_OVERLAPPED,
+			PIPE_TYPE_MESSAGE
+				| PIPE_WAIT,
+			MAX_DEVICES,
+			PIPE_BUF,
+			PIPE_BUF,
+			0,
+			NULL);
+
+		if (p->pipe == INVALID_HANDLE_VALUE) {
+			fprintf(stderr, "supervisor: can't create device pipe for %d\n", i);
+			return -1;
+		}
+
+		switch (overlapped_connect_pipe(p->pipe, &p->ov)) {
+		case 0:
+			p->status = UNCONNECTED;
+			break;
+
+		case 1:
+			p->status = NOT_READY;
+			break;
+
+		default:
+			/* error already printed by overlapped_connect_pipe() */
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int init_detector_pipe()
+{
+	struct incoming_pipe *p = &state.detector;
+
+	if (!(events[DETECTOR_EVENT] = CreateEvent(NULL, TRUE, TRUE, NULL))) {
+		fprintf(stderr, "supervisor: couldn't allocate detector event\n");
+		return -1;
+	}
+
+	p->ov.hEvent = events[DETECTOR_EVENT];
+
+	p->pipe = CreateNamedPipe(
+		SOSC_DETECTOR_PIPE,
+		PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
+		PIPE_TYPE_MESSAGE,
+		1,
+		PIPE_BUF,
+		PIPE_BUF,
+		0,
+		NULL);
+
+	if (p->pipe == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "supervisor: can't create detector pipe\n");
+		return -1;
+	}
+
+	switch (overlapped_connect_pipe(p->pipe, &p->ov)) {
+	case 0:
+		p->status = UNCONNECTED;
+		break;
+
+	case 1:
+		p->status = NOT_READY;
+		break;
+
+	default:
+		/* error already printed by overlapped_connect_pipe() */
+		return -1;
+	}
+
+	return 0;
+}
+
+static int init_osc_server()
+{
+	if (!(events[OSC_EVENT] = CreateEvent(NULL, TRUE, FALSE, NULL))) {
+		fprintf(stderr, "supervisor: couldn't allocate osc event\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int init_events()
+{
+	if (init_osc_server() ||
+		init_device_events() ||
+		init_detector_pipe())
+		return -1;
+
+	return 0;
+}
+
+/*************************************************************************
+ * windows bullshit
+ *************************************************************************/
+
 static int setup_reaper_job()
 {
 	JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli;
 	memset(&jeli, '\0', sizeof(jeli));
 
 	if( !(state.reaper_job = CreateJobObject(NULL, NULL)) )
-		return 1;
+		return -1;
 
 	jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
 	if( !SetInformationJobObject(
 			state.reaper_job, JobObjectExtendedLimitInformation, &jeli,
 			sizeof(jeli)) )
-		return 1;
+		return -1;
 
 	return 0;
 }
@@ -139,141 +505,34 @@ err_manager:
 	return NULL;
 }
 
-static int init_detector_pipe()
-{
-	state.detector_pipe = CreateNamedPipe(
-		SOSC_DETECTOR_PIPE,
-		PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
-		PIPE_TYPE_MESSAGE,
-		1,
-		64,
-		64,
-		0,
-		NULL);
-
-	if (state.detector_pipe == INVALID_HANDLE_VALUE) {
-		fprintf(stderr, "supervisor: can't create detector pipe\n");
-		return 1;
-	}
-
-	return 0;
-}
-
-void pipe_read(HANDLE pipe)
-{
-	char buf[128];
-	ssize_t read;
-
-	read = overlapped_read(pipe, (uint8_t *) buf, sizeof(buf));
-
-	if (read > 0) {
-		buf[read] = '\0';
-		printf("[+] read %d bytes\n", read);
-		printf("\"%s\"\n", buf);
-	} else
-		printf("[-] read failed\n");
-}
-
-int overlapped_connect_pipe(HANDLE p)
-{
-	OVERLAPPED ov = {0, 0, {{0, 0}}};
-	DWORD what, err;
-
-	if (!(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL))) {
-		fprintf(stderr,
-				"overlapped_connect_pipe(): could not allocate event (%ld)\n",
-				GetLastError());
-		return -1;
-	}
-
-	if (!ConnectNamedPipe(p, &ov)) {
-		switch ((err = GetLastError())) {
-		case ERROR_PIPE_CONNECTED:
-			what = 0;
-			goto done;
-
-		case ERROR_IO_PENDING:
-			break;
-
-		default:
-			fprintf(stderr, "overlapped_connect_pipe(): connect failed (%ld)\n",
-					err);
-			return -1;
-		}
-
-		GetOverlappedResult(p, &ov, &what, TRUE);
-	}
-
-done:
-	CloseHandle(ov.hEvent);
-	return what;
-}
-
-int read_ipc_msg_from(int fd)
-{
-	sosc_ipc_msg_t msg;
-	DWORD available;
-	ssize_t nbytes;
-	HANDLE h;
-
-	h = (HANDLE) _get_osfhandle(fd);
-	((void) h);
-
-	if (!PeekNamedPipe(h, NULL, 0, NULL, &available, NULL) || !available)
-		return 0;
-
-	nbytes = sosc_ipc_msg_read(fd, &msg);
-
-	if (nbytes > 0)
-		printf("[+] read %d bytes\n", nbytes);
-	else {
-		printf("[-] read %d bytes\n", nbytes);
-		return -1;
-	}
-
-	switch (msg.type) {
-	case SOSC_DEVICE_CONNECTION:
-		fprintf(stderr, "connection, port %s\n", msg.connection.devnode);
-		break;
-
-	default:
-		break;
-	}
-
-	return nbytes;
-}
-
-void fuck()
-{
-	int fd = _open_osfhandle((intptr_t) state.detector_pipe, 0);
-	Sleep(250);
-	while (read_ipc_msg_from(fd));
-}
+/*************************************************************************
+ * entry point from detector
+ *************************************************************************/
 
 int sosc_supervisor_run(char *progname)
 {
-	if (init_detector_pipe())
-		goto err_detector_pipe;
+	if (init_events())
+		goto err_ev_init;
 
 	if (!(state.exec_path = get_service_binpath()))
 		goto err_get_binpath;
 
 	if (!(state.quoted_exec_path = s_asprintf("\"%s\"", state.exec_path))) {
-		fprintf(stderr, "detector_run() error: couldn't allocate memory\n");
+		fprintf(stderr, "sosc_supervisor_run() error: couldn't allocate memory\n");
 		goto err_asprintf;
 	}
 
 	if (setup_reaper_job())
 		goto err_reaper;
 
-	overlapped_connect_pipe(state.detector_pipe);
-	fuck();
+	read_loop();
+
 	return 0;
 
 err_reaper:
 err_asprintf:
 	s_free(state.exec_path);
 err_get_binpath:
-err_detector_pipe:
-	return 1;
+err_ev_init:
+	return -1;
 }

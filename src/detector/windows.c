@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 /* for RegisterDeviceNotification */
 #define WINVER 0x501
@@ -32,7 +33,7 @@
 #define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
 
 struct detector_state {
-	int pipe_to_supervisor;
+	HANDLE pipe_to_supervisor;
 
 	SERVICE_STATUS svc_status;
 	SERVICE_STATUS_HANDLE hstatus;
@@ -50,14 +51,25 @@ struct detector_state state = {
 	}
 };
 
-static void send_connect(const char *devnode)
+void send_connect(char *port)
 {
-	sosc_ipc_msg_t msg = {
+	uint8_t buf[64];
+	DWORD written;
+	size_t bufsiz;
+
+	sosc_ipc_msg_t m = {
 		.type = SOSC_DEVICE_CONNECTION,
-		.connection = {.devnode = (char *) devnode}
+		.connection = {.devnode = port}
 	};
 
-	sosc_ipc_msg_write(state.pipe_to_supervisor, &msg);
+	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), &m);
+
+	if (bufsiz < 0) {
+		fprintf(stderr, "[-] couldn't serialize msg\n");
+		return;
+	}
+
+	WriteFile(state.pipe_to_supervisor, buf, bufsiz, &written, NULL);
 }
 
 int scan_connected_devices()
@@ -139,10 +151,10 @@ char *ftdishit_to_port(char *bullshit)
 	DWORD plen, ptype;
 	HKEY subkey;
 
-	if( !(bullshit = strchr(bullshit, '#')) )
-		return NULL;
+	if (!(bullshit = strchr(bullshit, '#')))
+	    return NULL;
 
-	if( !(port = strchr(++bullshit, '#')) )
+	if (!(port = strchr(++bullshit, '#')))
 		return NULL;
 
 	*port = '\0';
@@ -150,9 +162,9 @@ char *ftdishit_to_port(char *bullshit)
 	subkey_path = s_asprintf(FTDI_REG_PATH "\\%s\\0000\\Device Parameters",
 	                         bullshit);
 
-	switch( RegOpenKeyEx(
+	switch (RegOpenKeyEx(
 	        HKEY_LOCAL_MACHINE, subkey_path,
-	        0, KEY_READ, &subkey) ) {
+	        0, KEY_READ, &subkey)) {
 	case ERROR_SUCCESS:
 		break;
 
@@ -165,8 +177,8 @@ char *ftdishit_to_port(char *bullshit)
 
 	plen = sizeof(port_name) / sizeof(char);
 	ptype = REG_SZ;
-	switch( RegQueryValueEx(subkey, "PortName", 0, &ptype,
-	                        (unsigned char *) port_name, &plen) ) {
+	switch (RegQueryValueEx(subkey, "PortName", 0, &ptype,
+	                        (unsigned char *) port_name, &plen)) {
 	case ERROR_SUCCESS:
 		port_name[plen] = '\0';
 		break;
@@ -270,6 +282,7 @@ err_rdnotification:
 static int open_pipe_to_supervisor()
 {
 	HANDLE p = NULL;
+	DWORD pipe_state;
 
 	do {
 		p = CreateFile(
@@ -294,7 +307,10 @@ static int open_pipe_to_supervisor()
 		}
 	} while (1);
 
-	state.pipe_to_supervisor = _open_osfhandle((intptr_t) p, 0);
+	pipe_state = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(p, &pipe_state, NULL, NULL);
+
+	state.pipe_to_supervisor = p;
 
 	return 0;
 }
@@ -306,7 +322,11 @@ static DWORD WINAPI detector_thread(LPVOID param)
 	else
 		fprintf(stderr, "[+] opened supervisor pipe\n");
 
-	scan_connected_devices();
+	for (;;) {
+		scan_connected_devices();
+		Sleep(500);
+	}
+
 	return 0;
 }
 

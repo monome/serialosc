@@ -156,7 +156,7 @@ static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
 {
 	lo_server *srv;
 
-	if (!(srv = lo_server_new("12002", NULL)))
+	if (!(srv = lo_server_new(SOSC_SUPERVISOR_OSC_PORT, NULL)))
 		return NULL;
 
 	lo_server_add_method(srv, "/serialosc/list", "si", dsc_list_devices, devs);

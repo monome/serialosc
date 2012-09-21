@@ -24,6 +24,10 @@
 
 #define IPC_MAGIC 0x505C /* SOSC, get it? */
 
+/*************************************************************************
+ * i/o from file descriptors
+ *************************************************************************/
+
 static int read_strdata(int fd, size_t n, ...)
 {
 	const char **cur;
@@ -142,6 +146,10 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 
 	return nbytes;
 }
+
+/*************************************************************************
+ * serializing to and from buffers
+ *************************************************************************/
 
 static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 {

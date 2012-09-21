@@ -23,6 +23,7 @@
 
 #include "platform.h"
 
+#define SOSC_SUPERVISOR_OSC_PORT "12002"
 #define SOSC_WIN_SERVICE_NAME "serialosc"
 
 typedef struct {
