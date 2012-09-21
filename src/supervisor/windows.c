@@ -31,7 +31,7 @@
 
 #define ARRAY_LENGTH(x)  (sizeof(x) / sizeof(*x))
 
-#define PIPE_BUF         64
+#define PIPE_BUF         128
 #define SOSC_DEVICE_PIPE (SOSC_PIPE_PREFIX "devices")
 
 #define MAX_DEVICES      32
@@ -80,32 +80,6 @@ struct supervisor_state state;
  * overlapped i/o helpers
  *************************************************************************/
 
-static ssize_t overlapped_read(HANDLE h, uint8_t *buf, size_t nbyte)
-{
-	OVERLAPPED ov = {0, 0, {{0, 0}}};
-	DWORD read = 0;
-
-	if( !(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) ) {
-		fprintf(stderr,
-				"overlapped_read(): could not allocate event (%ld)\n",
-				GetLastError());
-		return -1;
-	}
-
-	if( !ReadFile(h, buf, nbyte, &read, &ov) ) {
-		if( GetLastError() != ERROR_IO_PENDING ) {
-			fprintf(stderr, "overlapped_read(): read failed (%ld)\n",
-					GetLastError());
-			return -1;
-		}
-
-		GetOverlappedResult(h, &ov, &read, TRUE);
-	}
-
-	CloseHandle(ov.hEvent);
-	return read;
-}
-
 static int overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
 {
 	DWORD err;
@@ -129,6 +103,7 @@ static int overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
 	return 0;
 }
 
+#if 0
 int spawn_server(const char *devnode) {
 	intptr_t proc;
 
@@ -144,38 +119,94 @@ int spawn_server(const char *devnode) {
 
 	return 0;
 }
+#endif
 
-int pipe_read(HANDLE pipe)
+static HANDLE open_pipe_to_supervisor()
 {
-	sosc_ipc_msg_t *msg;
-	char buf[PIPE_BUF];
-	ssize_t read;
+	SECURITY_ATTRIBUTES sattr;
+	HANDLE p = NULL;
+	DWORD pipe_state;
 
-	read = overlapped_read(pipe, (uint8_t *) buf, sizeof(buf));
+	sattr.nLength = sizeof(SECURITY_ATTRIBUTES);
+	sattr.bInheritHandle = TRUE;
+	sattr.lpSecurityDescriptor = NULL;
 
-	if (read <= 0) {
-		fprintf(stderr, "[-] read failed\n");
-		return read;
+	do {
+		p = CreateFile(
+			SOSC_DEVICE_PIPE,
+			GENERIC_WRITE,
+			0,
+			&sattr,
+			OPEN_EXISTING,
+			0,
+			NULL);
+
+		if (p != INVALID_HANDLE_VALUE)
+			break;
+			
+		switch (GetLastError()) {
+		case ERROR_FILE_NOT_FOUND:
+			Sleep(100);
+			continue;
+
+		default:
+			return INVALID_HANDLE_VALUE;
+		}
+	} while (1);
+
+	pipe_state = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(p, &pipe_state, NULL, NULL);
+
+	return p;
+}
+
+int spawn_server(const char *devnode)
+{
+	STARTUPINFO sinfo = {sizeof(sinfo)};
+	PROCESS_INFORMATION pinfo;
+	HANDLE pipe_to_supervisor;
+	char *cmdline;
+
+	pipe_to_supervisor = open_pipe_to_supervisor();
+	if (pipe_to_supervisor == INVALID_HANDLE_VALUE) {
+		fprintf(stderr,
+			"supervisor: spawn_server(): couldn't open supervisor pipe\n");
+		return -1;
 	}
 
-	fprintf(stderr, "[+] read %d bytes\n", read);
-	if (sosc_ipc_msg_from_buf((uint8_t *) buf, read, &msg))
-		fprintf(stderr, "[-] bad message\n");
-
-	switch (msg->type) {
-	case SOSC_DEVICE_CONNECTION:
-		fprintf(stderr, "connection, port %s\n", msg->connection.devnode);
-		break;
-
-	case SOSC_DEVICE_INFO:
-		fprintf(stderr, "info\n");
-		break;
-
-	default:
-		break;
+	if (!(cmdline = s_asprintf("%s %s", state.quoted_exec_path, devnode))) {
+		fprintf(stderr, "supervisor: spawn_server(): asprintf failed\n");
+		return -1;
 	}
 
-	return read;
+	sinfo.dwFlags    = STARTF_USESTDHANDLES;
+	sinfo.hStdInput  = INVALID_HANDLE_VALUE;
+	sinfo.hStdError  = INVALID_HANDLE_VALUE;
+	sinfo.hStdOutput = pipe_to_supervisor;
+
+	if (!CreateProcess(
+			state.exec_path,
+			cmdline,
+			NULL,
+			NULL,
+			TRUE,
+			CREATE_NO_WINDOW,
+			NULL,
+			NULL,
+			&sinfo,
+			&pinfo)) {
+		fprintf(stderr, "supervisor: spawn_server(): CreateProcess failed (%ld)\n",
+				GetLastError());
+		return -1;
+	}
+
+	AssignProcessToJobObject(state.reaper_job, pinfo.hProcess);
+
+	CloseHandle(pinfo.hProcess);
+	CloseHandle(pinfo.hThread);
+	CloseHandle(pipe_to_supervisor);
+
+	return 0;
 }
 
 /*************************************************************************
@@ -199,6 +230,27 @@ struct incoming_pipe pipe_info[MAX_DEVICES] = {
  * supervisor read loop
  *************************************************************************/
 
+static int handle_disconnect(struct incoming_pipe *p)
+{
+	DisconnectNamedPipe(p->pipe);
+
+	switch (overlapped_connect_pipe(p->pipe, &p->ov)) {
+	case 0:
+		p->status = UNCONNECTED;
+		break;
+
+	case 1:
+		p->status = NOT_READY;
+		break;
+
+	default:
+		/* error already printed by overlapped_connect_pipe() */
+		return -1;
+	}
+
+	return 0;
+}
+
 static int handle_read(struct incoming_pipe *p)
 {
 	sosc_ipc_msg_t *msg;
@@ -212,11 +264,25 @@ static int handle_read(struct incoming_pipe *p)
 
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
-		fprintf(stderr, "connection, port %s\n", msg->connection.devnode);
+		spawn_server(msg->connection.devnode);
+		Sleep(500);
 		break;
 
 	case SOSC_DEVICE_INFO:
 		fprintf(stderr, "info\n");
+		break;
+
+	case SOSC_DEVICE_READY:
+		fprintf(stderr, "ready\n");
+		p->status = READY;
+		break;
+
+	case SOSC_DEVICE_DISCONNECTION:
+		fprintf(stderr, "disconnection :(\n");
+		break;
+
+	case SOSC_OSC_PORT_CHANGE:
+		fprintf(stderr, "port change\n");
 		break;
 
 	default:
@@ -243,7 +309,7 @@ static int handle_pipe(struct incoming_pipe *p)
 	case NOT_READY:
 	case READY:
 		if (!res || !p->read.nbytes) {
-			/* disconnect, reconnect */
+			handle_disconnect(p);
 			return 0;
 		}
 
@@ -279,15 +345,13 @@ queue_read:
 		}
 	}
 
-	/* disconnect, reconnect? */
+	handle_disconnect(p);
 	return 0;
 }
 
 static void read_loop()
 {
 	int which;
-
-	Sleep(100);
 
 	fprintf(stderr, "\n[+] supervisor: read_loop() start\n");
 

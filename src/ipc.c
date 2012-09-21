@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "serialosc.h"
@@ -197,6 +198,48 @@ static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 	return avail - nbytes;
 }
 
+ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
+{
+	ssize_t avail, strbytes;
+
+	if (nbytes < sizeof(*msg))
+		return -1;
+
+	avail = nbytes;
+
+	msg->magic = IPC_MAGIC;
+	memcpy(buf, msg, sizeof(*msg));
+
+	nbytes -= sizeof(*msg);
+	buf += sizeof(*msg);
+
+	switch (msg->type) {
+	case SOSC_DEVICE_CONNECTION:
+		strbytes = strdata_to_buf(buf, nbytes, 1, msg->connection.devnode);
+
+		if (strbytes < 0)
+			return -1;
+		break;
+
+	case SOSC_DEVICE_INFO:
+		strbytes = strdata_to_buf(buf, nbytes, 2, msg->device_info.serial,
+								  msg->device_info.friendly);
+
+		if (strbytes < 0)
+			return -1;
+		break;
+
+	default:
+		strbytes = 0;
+		break;
+	}
+
+	nbytes -= strbytes;
+	assert(nbytes >= 0);
+
+	return avail - nbytes;
+}
+
 static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 {
 	const char **cur;
@@ -251,47 +294,6 @@ static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 #undef BUF_WALK
 
 	return 0;
-
-}
-
-ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
-{
-	ssize_t avail, strbytes;
-
-	if (nbytes < sizeof(*msg))
-		return -1;
-
-	avail = nbytes;
-
-	msg->magic = IPC_MAGIC;
-	memcpy(buf, msg, sizeof(*msg));
-
-	nbytes -= sizeof(*msg);
-	buf += sizeof(*msg);
-
-	switch (msg->type) {
-	case SOSC_DEVICE_CONNECTION:
-		strbytes = strdata_to_buf(buf, nbytes, 1, msg->connection.devnode);
-
-		if (strbytes < 0)
-			return -1;
-		break;
-
-	case SOSC_DEVICE_INFO:
-		strbytes = strdata_to_buf(buf, nbytes, 2, msg->device_info.serial,
-								  msg->device_info.friendly);
-
-		if (strbytes < 0)
-			return -1;
-	default:
-		strbytes = 0;
-		break;
-	}
-
-	nbytes -= strbytes;
-	assert(nbytes >= 0);
-
-	return avail - nbytes;
 }
 
 int sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)

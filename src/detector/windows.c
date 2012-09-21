@@ -317,15 +317,10 @@ static int open_pipe_to_supervisor()
 
 static DWORD WINAPI detector_thread(LPVOID param)
 {
-	if (open_pipe_to_supervisor())
-		fprintf(stderr, "[-] couldn't open pipe to supervisor\n");
-	else
-		fprintf(stderr, "[+] opened supervisor pipe\n");
+	Sleep(500);
 
-	for (;;) {
-		scan_connected_devices();
-		Sleep(500);
-	}
+	open_pipe_to_supervisor();
+	scan_connected_devices();
 
 	return 0;
 }
@@ -333,14 +328,10 @@ static DWORD WINAPI detector_thread(LPVOID param)
 void debug_main()
 {
 	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
-	fprintf(stderr, "[ ] creating detector thread...");
 	CreateThread(NULL, 0, detector_thread, NULL, 0, NULL);
-	fprintf(stderr, "\r[+] creating detector thread...okay\n");
 
 	if (sosc_supervisor_run(NULL))
 		fprintf(stderr, "[-] supervisor returned unexpectedly\n");
-
-	Sleep(500);
 }
 
 int sosc_detector_run(const char *exec_path)

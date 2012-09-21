@@ -104,6 +104,17 @@ static void send_connection_status(sosc_state_t *state, int status) {
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "");
 }
 
+#ifndef WIN32
+/* not windows */
+static void send_simple_ipc(int fd, sosc_ipc_type_t type)
+{
+	sosc_ipc_msg_t msg = {
+		.type = type
+	};
+
+	sosc_ipc_msg_write(fd, &msg);
+}
+
 static void send_device_info(int fd, monome_t *monome)
 {
 	sosc_ipc_msg_t msg = {
@@ -126,6 +137,24 @@ static void send_osc_port_change(int fd, uint16_t port)
 
 	sosc_ipc_msg_write(fd, &msg);
 }
+#else
+/* windows. */
+static void send_ipc_msg(sosc_ipc_msg_t *msg)
+{
+	HANDLE p = (HANDLE) _get_osfhandle(STDOUT_FILENO);
+	uint8_t buf[64];
+	DWORD written;
+	ssize_t bufsiz;
+
+	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), msg);
+
+	if (bufsiz < 0) {
+		fprintf(stderr, "[-] couldn't serialize msg\n");
+		return;
+	}
+
+	WriteFile(p, buf, bufsiz, &written, NULL);
+}
 
 static void send_simple_ipc(int fd, sosc_ipc_type_t type)
 {
@@ -133,8 +162,33 @@ static void send_simple_ipc(int fd, sosc_ipc_type_t type)
 		.type = type
 	};
 
-	sosc_ipc_msg_write(fd, &msg);
+	send_ipc_msg(&msg);
 }
+
+static void send_device_info(int fd, monome_t *monome)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_INFO,
+	};
+
+	msg.device_info.serial = (char *) monome_get_serial(monome);
+	msg.device_info.friendly = (char *) monome_get_friendly_name(monome);
+
+	send_ipc_msg(&msg);
+}
+
+static void send_osc_port_change(int fd, uint16_t port)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_OSC_PORT_CHANGE,
+	};
+
+	msg.port_change.port = port;
+
+	if (0)
+		send_ipc_msg(&msg);
+}
+#endif
 
 static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
                    DNSServiceErrorType errorCode, const char *name,
