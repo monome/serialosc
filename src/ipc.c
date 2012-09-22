@@ -152,7 +152,7 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
  * serializing to and from buffers
  *************************************************************************/
 
-static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
+static ssize_t strdata_to_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 {
 	uint16_t magic = IPC_MAGIC;
 	const char *cur;
@@ -163,9 +163,9 @@ static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 #define BUF_WALK(bytes)  \
 	do {                 \
 		buf += bytes;    \
-		nbytes -= bytes; \
+		avail -= bytes; \
 		                 \
-		if (nbytes < 0)  \
+		if (avail < 0)  \
 			return -1;   \
 	} while (0)
 
@@ -179,8 +179,8 @@ static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 #define EMIT_VAR(v) EMIT_BYTES(&v, sizeof(v))
 
 	avail = nbytes;
-
 	va_start(ap, n);
+
 	while (n--) {
 		cur = va_arg(ap, const char *);
 		slen = strlen(cur);
@@ -189,13 +189,14 @@ static ssize_t strdata_to_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 		EMIT_BYTES(cur, slen);
 		EMIT_VAR(magic);
 	}
+
 	va_end(ap);
 
 #undef EMIT_VAR
 #undef EMIT_BYTES
 #undef BUF_WALK
 
-	return avail - nbytes;
+	return nbytes - avail;
 }
 
 ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
@@ -210,8 +211,8 @@ ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
 	msg->magic = IPC_MAGIC;
 	memcpy(buf, msg, sizeof(*msg));
 
-	nbytes -= sizeof(*msg);
 	buf += sizeof(*msg);
+	avail -= sizeof(*msg);
 
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
@@ -229,32 +230,36 @@ ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
 			return -1;
 		break;
 
-	default:
+	case SOSC_DEVICE_READY:
+	case SOSC_DEVICE_DISCONNECTION:
+	case SOSC_OSC_PORT_CHANGE:
 		strbytes = 0;
 		break;
+
+	default:
+		return -1;
 	}
 
-	nbytes -= strbytes;
-	assert(nbytes >= 0);
+	avail -= strbytes;
+	assert(avail >= 0);
 
-	return avail - nbytes;
+	return nbytes - avail;
 }
 
-static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
+static ssize_t strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 {
 	const char **cur;
 	uint16_t magic;
+	ssize_t avail;
 	size_t slen;
 	va_list ap;
-
-	va_start(ap, n);
 
 #define BUF_WALK(bytes)  \
 	do {                 \
 		buf += bytes;    \
-		nbytes -= bytes; \
+		avail -= bytes; \
 		                 \
-		if (nbytes < 0)  \
+		if (avail < 0)  \
 			return -1;   \
 	} while (0)
 
@@ -270,6 +275,9 @@ static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 		CONSUME_BYTES(sizeof(type)); \
 	}))
 
+	avail = nbytes;
+	va_start(ap, n);
+
 	while (n--) {
 		cur = va_arg(ap, const char **);
 		*cur = NULL;
@@ -280,7 +288,7 @@ static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 
 		if (magic != IPC_MAGIC) {
 			*cur = NULL;
-			return 1;
+			return -1;
 		}
 
 		/* null-terminate the string (this is a little hack) */
@@ -293,39 +301,58 @@ static int strdata_from_buf(uint8_t *buf, ssize_t nbytes, size_t n, ...)
 #undef CONSUME_BYTES
 #undef BUF_WALK
 
-	return 0;
+	return nbytes - avail;
 }
 
-int sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)
+ssize_t sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)
 {
+	ssize_t avail, strbytes;
 	*msg = (sosc_ipc_msg_t *) buf;
 
 	if (nbytes < sizeof(**msg) || (*msg)->magic != IPC_MAGIC)
 		goto invalid_msg;
 
+	avail = nbytes;
+
 	buf += sizeof(**msg);
-	nbytes -= sizeof(**msg);
+	avail -= sizeof(**msg);
 
 	switch ((*msg)->type) {
 	case SOSC_DEVICE_CONNECTION:
 		(*msg)->connection.devnode = NULL;
-		if (strdata_from_buf(buf, nbytes, 1, &(*msg)->connection.devnode))
-			goto invalid_msg;
 
+		strbytes = strdata_from_buf(
+			buf, nbytes, 1,
+			&(*msg)->connection.devnode);
+
+		if (strbytes < 0)
+			goto invalid_msg;
 		break;
 
 	case SOSC_DEVICE_INFO:
 		(*msg)->device_info.serial = (*msg)->device_info.friendly = NULL;
 
-		if (strdata_from_buf(buf, nbytes, 2, &(*msg)->device_info.serial,
-		                 &(*msg)->device_info.friendly))
+		strbytes = strdata_from_buf(
+			buf, nbytes, 2,
+			&(*msg)->device_info.serial,
+			&(*msg)->device_info.friendly);
+
+		if (strbytes < 0)
 			goto invalid_msg;
+		break;
+
+	case SOSC_DEVICE_READY:
+	case SOSC_DEVICE_DISCONNECTION:
+	case SOSC_OSC_PORT_CHANGE:
+		strbytes = 0;
+		break;
 
 	default:
-		break;
+		return -1;
 	}
 
-	return 0;
+	avail -= strbytes;
+	return nbytes - avail;
 
 invalid_msg:
 	*msg = NULL;

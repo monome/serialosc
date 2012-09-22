@@ -251,21 +251,12 @@ static int handle_disconnect(struct incoming_pipe *p)
 	return 0;
 }
 
-static int handle_read(struct incoming_pipe *p)
+static int handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 {
-	sosc_ipc_msg_t *msg;
-
-	fprintf(stderr, "[+] read complete, got %d bytes\n", p->read.nbytes);
-
-	if (sosc_ipc_msg_from_buf((uint8_t *) p->read.buf, p->read.nbytes, &msg)) {
-		fprintf(stderr, "[-] bad message\n");
-		return -1;
-	}
-
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
+		fprintf(stderr, "connection\n");
 		spawn_server(msg->connection.devnode);
-		Sleep(500);
 		break;
 
 	case SOSC_DEVICE_INFO:
@@ -284,10 +275,37 @@ static int handle_read(struct incoming_pipe *p)
 	case SOSC_OSC_PORT_CHANGE:
 		fprintf(stderr, "port change\n");
 		break;
-
-	default:
-		break;
 	}
+
+	return 0;
+}
+
+static int handle_read(struct incoming_pipe *p)
+{
+	ssize_t bytes_left, bytes_handled;
+	uint8_t *buf;
+	sosc_ipc_msg_t *msg;
+
+	buf = (uint8_t *) p->read.buf;
+	bytes_left = p->read.nbytes;
+
+	fprintf(stderr, "[+] read complete, got %d bytes\n", bytes_left);
+
+	do {
+		bytes_handled = sosc_ipc_msg_from_buf(buf, bytes_left, &msg);
+
+		if (bytes_handled < 0) {
+			fprintf(stderr, "[-] bad message\n");
+			return -1;
+		}
+
+		handle_msg(p, msg);
+
+		buf += bytes_handled;
+		bytes_left -= bytes_handled;
+
+		fprintf(stderr, "[$] handled %d bytes, %d left\n", bytes_handled, bytes_left);
+	} while (bytes_left > 0);
 
 	return 0;
 }
@@ -329,7 +347,7 @@ queue_read:
 		&p->ov);
 
 	if (res && p->read.nbytes > 0) {
-		fprintf(stderr, "[!] immediate return\n");
+		fprintf(stderr, "[!] immediate return (\'read\' is super effective!)\n");
 		handle_read(p);
 		goto queue_read;
 	}
@@ -338,6 +356,9 @@ queue_read:
 		switch ((res = GetLastError())) {
 		case ERROR_IO_PENDING:
 			return 0;
+
+		case ERROR_BROKEN_PIPE:
+			break;
 
 		default:
 			fprintf(stderr, "supervisor: handle_pipe(): error %ld\n", res);

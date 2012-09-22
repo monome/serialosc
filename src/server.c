@@ -185,8 +185,7 @@ static void send_osc_port_change(int fd, uint16_t port)
 
 	msg.port_change.port = port;
 
-	if (0)
-		send_ipc_msg(&msg);
+	send_ipc_msg(&msg);
 }
 #endif
 
