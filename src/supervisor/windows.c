@@ -195,10 +195,13 @@ int spawn_server(const char *devnode)
 			NULL,
 			&sinfo,
 			&pinfo)) {
+		s_free(cmdline);
 		fprintf(stderr, "supervisor: spawn_server(): CreateProcess failed (%ld)\n",
 				GetLastError());
 		return -1;
 	}
+
+	s_free(cmdline);
 
 	AssignProcessToJobObject(state.reaper_job, pinfo.hProcess);
 
