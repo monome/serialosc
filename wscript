@@ -189,7 +189,6 @@ def configure(conf):
 	if conf.env.DEST_OS == "win32":
 		conf.define("WIN32", 1)
 		conf.env.append_unique("LIB_LO", "ws2_32")
-		conf.env.append_unique("LIB_CONFUSE", "intl")
 		conf.env.append_unique("LINKFLAGS", ["-Wl,--enable-stdcall-fixup"])
 	elif conf.env.DEST_OS == "darwin":
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.5"])
