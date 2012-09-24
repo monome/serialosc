@@ -56,15 +56,12 @@ int main(int argc, char **argv)
 
 #ifndef WIN32
 		if (sosc_supervisor_run(argv[0]))
-			return EXIT_FAILURE;
-		else
-			return EXIT_SUCCESS;
 #else
 		if (sosc_detector_run(argv[0]))
+#endif
 			return EXIT_FAILURE;
 		else
 			return EXIT_SUCCESS;
-#endif
 	}
 
 	/* otherwise, we'll run as a per-device server. this next odd line

@@ -77,7 +77,11 @@ struct supervisor_state {
 	const char *quoted_exec_path;
 };
 
-struct supervisor_state state;
+static struct supervisor_state state = {
+	.detector = {
+		.ov     = {0, 0, {{0, 0}}},
+	}
+};
 
 /*************************************************************************
  * overlapped i/o helpers
@@ -683,7 +687,6 @@ int sosc_supervisor_run(char *progname)
 		goto err_reaper;
 
 	read_loop();
-
 	return 0;
 
 err_reaper:

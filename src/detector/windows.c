@@ -39,7 +39,7 @@ struct detector_state {
 	SERVICE_STATUS_HANDLE hstatus;
 };
 
-struct detector_state state = {
+static struct detector_state state = {
 	.svc_status = {
 		.dwServiceType = SERVICE_WIN32,
 		.dwCurrentState = SERVICE_START_PENDING,
@@ -251,34 +251,6 @@ int setup_device_notification()
 	return 0;
 }
 
-void WINAPI service_main(DWORD argc, LPTSTR *argv)
-{
-	state.hstatus = RegisterServiceCtrlHandlerEx(
-		SOSC_WIN_SERVICE_NAME, control_handler, NULL);
-
-	if( !state.hstatus )
-		return;
-
-	state.svc_status.dwCurrentState = SERVICE_RUNNING;
-	SetServiceStatus(state.hstatus, &state.svc_status);
-
-	scan_connected_devices(&state);
-
-	if (setup_device_notification())
-		goto err_rdnotification;
-
-	/* sosc_supervisor_run() should not return */
-	if (sosc_supervisor_run(NULL))
-		goto err_supervisor;
-
-err_supervisor:
-err_rdnotification:
-	state.svc_status.dwCurrentState = SERVICE_STOPPED;
-	state.svc_status.dwWin32ExitCode = 1;
-	SetServiceStatus(state.hstatus, &state.svc_status);
-	return;
-}
-
 static int open_pipe_to_supervisor()
 {
 	HANDLE p = NULL;
@@ -303,7 +275,7 @@ static int open_pipe_to_supervisor()
 			continue;
 
 		default:
-			return 1;
+			return -1;
 		}
 	} while (1);
 
@@ -315,23 +287,53 @@ static int open_pipe_to_supervisor()
 	return 0;
 }
 
-static DWORD WINAPI detector_thread(LPVOID param)
+static DWORD WINAPI supervisor_thread(LPVOID param)
 {
-	Sleep(500);
-
-	open_pipe_to_supervisor();
-	scan_connected_devices();
-
+	sosc_supervisor_run(NULL);
 	return 0;
+}
+
+void WINAPI service_main(DWORD argc, LPTSTR *argv)
+{
+	state.hstatus = RegisterServiceCtrlHandlerEx(
+		SOSC_WIN_SERVICE_NAME, control_handler, NULL);
+
+	if( !state.hstatus )
+		return;
+
+	state.svc_status.dwCurrentState = SERVICE_RUNNING;
+	SetServiceStatus(state.hstatus, &state.svc_status);
+
+	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
+
+	if (open_pipe_to_supervisor())
+		goto err_supervisor_pipe;
+
+	if (setup_device_notification())
+		goto err_rdnotification;
+
+	scan_connected_devices(&state);
+	return;
+
+err_rdnotification:
+	CloseHandle(state.pipe_to_supervisor);
+err_supervisor_pipe:
+	state.svc_status.dwCurrentState = SERVICE_STOPPED;
+	state.svc_status.dwWin32ExitCode = 1;
+	SetServiceStatus(state.hstatus, &state.svc_status);
+	return;
 }
 
 void debug_main()
 {
 	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
-	CreateThread(NULL, 0, detector_thread, NULL, 0, NULL);
+	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
 
-	if (sosc_supervisor_run(NULL))
-		fprintf(stderr, "[-] supervisor returned unexpectedly\n");
+	open_pipe_to_supervisor();
+	scan_connected_devices();
+
+	while(1)
+		Sleep(10000);
 }
 
 int sosc_detector_run(const char *exec_path)
@@ -341,8 +343,16 @@ int sosc_detector_run(const char *exec_path)
 		{NULL, NULL}
 	};
 
-	if (!StartServiceCtrlDispatcher(services))
-		debug_main();
+	if (!StartServiceCtrlDispatcher(services)) {
+		switch (GetLastError()) {
+		case ERROR_FAILED_SERVICE_CONTROLLER_CONNECT:
+			debug_main();
+			break;
+
+		default:
+			break;
+		}
+	}
 
 	return 0;
 }
