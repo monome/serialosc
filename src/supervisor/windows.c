@@ -24,6 +24,10 @@
 #include <Dbt.h>
 #include <io.h>
 
+#include "serialosc.h"
+#include "ipc.h"
+#include "osc.h"
+
 /* damnit mingw */
 #ifndef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
 #define JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 0x00002000
@@ -38,9 +42,6 @@
 #define DETECTOR_EVENT   (MAX_DEVICES)
 #define OSC_EVENT        (MAX_DEVICES + 1)
 #define EVENT_COUNT      (MAX_DEVICES + 2) /* 1 for osc, 1 for detector */
-
-#include "serialosc.h"
-#include "ipc.h"
 
 struct device_info {
 	uint16_t port;
@@ -69,6 +70,8 @@ struct incoming_pipe {
 struct supervisor_state {
 	HANDLE reaper_job;
 	struct incoming_pipe detector;
+
+	lo_server *srv;
 
 	char *exec_path;
 	const char *quoted_exec_path;
@@ -213,7 +216,7 @@ int spawn_server(const char *devnode)
 }
 
 /*************************************************************************
- * osc stuff
+ * the datastore
  *************************************************************************/
 
 HANDLE events[EVENT_COUNT];
@@ -230,12 +233,92 @@ struct incoming_pipe pipe_info[MAX_DEVICES] = {
 };
 
 /*************************************************************************
+ * osc stuff
+ *************************************************************************/
+
+static int portstr(char *dest, int src) {
+	return snprintf(dest, 6, "%d", src);
+}
+
+OSC_HANDLER_FUNC(list_devices)
+{
+	struct incoming_pipe *p;
+	lo_address *dst;
+	char port[6];
+	int i;
+
+	portstr(port, argv[1]->i);
+
+	if (!(dst = lo_address_new(&argv[0]->s, port))) {
+		fprintf(stderr, "list_devices(): error in lo_address_new()\n");
+		return 1;
+	}
+
+	fprintf(stderr, "%s:%s\n", &argv[0]->s, port);
+
+	for (i = 0; i < MAX_DEVICES; i++) {
+		p = &pipe_info[i];
+
+		if (p->status != READY)
+			continue;
+
+		lo_send_from(dst, state.srv, LO_TT_IMMEDIATE,
+					 "/serialosc/device", "ssi",
+					 p->info.serial,
+					 p->info.friendly,
+					 p->info.port);
+	}
+
+	lo_address_free(dst);
+
+	return 0;
+}
+
+static void osc_error(int num, const char *msg, const char *where)
+{
+	fprintf(stderr, "[!] osc server error %d, \"%s\" (%s)", num, msg, where);
+}
+
+static int init_osc_server()
+{
+	if (!(state.srv = lo_server_new(SOSC_SUPERVISOR_OSC_PORT, osc_error))) {
+		fprintf(stderr, "supervisor: couldn't create lo_server\n");
+		goto err_server_new;
+	}
+
+	if (!(events[OSC_EVENT] = CreateEvent(NULL, TRUE, FALSE, NULL))) {
+		fprintf(stderr, "supervisor: couldn't allocate osc event\n");
+		goto err_create_event;
+	}
+
+	lo_server_add_method(
+		state.srv, "/serialosc/list", "si", list_devices, NULL);
+
+	return 0;
+
+err_create_event:
+		lo_server_free(state.srv);
+err_server_new:
+		return -1;
+}
+
+/*************************************************************************
  * supervisor read loop
  *************************************************************************/
 
 static int handle_disconnect(struct incoming_pipe *p)
 {
 	DisconnectNamedPipe(p->pipe);
+
+	if (p->info.serial) {
+		fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
+				p->info.serial);
+
+		s_free(p->info.serial);
+	}
+
+	if (p->info.friendly)
+		s_free(p->info.friendly);
 
 	switch (overlapped_connect_pipe(p->pipe, &p->ov)) {
 	case 0:
@@ -267,17 +350,12 @@ static int handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 		break;
 
 	case SOSC_DEVICE_READY:
-		fprintf(stderr, "[+] DEVICE READY: %s (%s) on port %d\n",
-				p->info.serial, p->info.friendly, p->info.port);
+		fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
+				p->info.serial, p->info.port);
 		p->status = READY;
 		break;
 
 	case SOSC_DEVICE_DISCONNECTION:
-		if (p->info.serial)
-			s_free(p->info.serial);
-
-		if (p->info.friendly)
-			s_free(p->info.friendly);
 		break;
 
 	case SOSC_OSC_PORT_CHANGE:
@@ -373,7 +451,11 @@ queue_read:
 
 static void read_loop()
 {
+	SOCKET osc_sock = lo_server_get_socket_fd(state.srv);
+	WSANETWORKEVENTS dont_care;
 	int which;
+
+	WSAEventSelect(osc_sock, events[OSC_EVENT], FD_READ);
 
 	for (;;) {
 		which = WaitForMultipleObjects(
@@ -390,7 +472,6 @@ static void read_loop()
 		}
 
 		which -= WAIT_OBJECT_0;
-		fprintf(stderr, "[!] object %d ready\n", which);
 
 		switch (which) {
 		case DETECTOR_EVENT:
@@ -401,6 +482,8 @@ static void read_loop()
 			break;
 
 		case OSC_EVENT:
+			while (lo_server_recv_noblock(state.srv, 0));
+			WSAEnumNetworkEvents(osc_sock, events[OSC_EVENT], &dont_care);
 			break;
 
 		default:
@@ -504,16 +587,6 @@ static int init_detector_pipe()
 
 	default:
 		/* error already printed by overlapped_connect_pipe() */
-		return -1;
-	}
-
-	return 0;
-}
-
-static int init_osc_server()
-{
-	if (!(events[OSC_EVENT] = CreateEvent(NULL, TRUE, FALSE, NULL))) {
-		fprintf(stderr, "supervisor: couldn't allocate osc event\n");
 		return -1;
 	}
 
