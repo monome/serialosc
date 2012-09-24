@@ -293,6 +293,7 @@ static ssize_t strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 
 		/* null-terminate the string (this is a little hack) */
 		*(buf - 2) = '\0';
+		*cur = s_strdup(*cur);
 	}
 
 	va_end(ap);

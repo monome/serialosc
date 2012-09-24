@@ -258,25 +258,30 @@ static int handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 {
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
-		fprintf(stderr, "connection\n");
 		spawn_server(msg->connection.devnode);
 		break;
 
 	case SOSC_DEVICE_INFO:
-		fprintf(stderr, "info\n");
+		p->info.serial = msg->device_info.serial;
+		p->info.friendly = msg->device_info.friendly;
 		break;
 
 	case SOSC_DEVICE_READY:
-		fprintf(stderr, "ready\n");
+		fprintf(stderr, "[+] DEVICE READY: %s (%s) on port %d\n",
+				p->info.serial, p->info.friendly, p->info.port);
 		p->status = READY;
 		break;
 
 	case SOSC_DEVICE_DISCONNECTION:
-		fprintf(stderr, "disconnection :(\n");
+		if (p->info.serial)
+			s_free(p->info.serial);
+
+		if (p->info.friendly)
+			s_free(p->info.friendly);
 		break;
 
 	case SOSC_OSC_PORT_CHANGE:
-		fprintf(stderr, "port change\n");
+		p->info.port = msg->port_change.port;
 		break;
 	}
 
@@ -292,8 +297,6 @@ static int handle_read(struct incoming_pipe *p)
 	buf = (uint8_t *) p->read.buf;
 	bytes_left = p->read.nbytes;
 
-	fprintf(stderr, "[+] read complete, got %d bytes\n", bytes_left);
-
 	do {
 		bytes_handled = sosc_ipc_msg_from_buf(buf, bytes_left, &msg);
 
@@ -306,8 +309,6 @@ static int handle_read(struct incoming_pipe *p)
 
 		buf += bytes_handled;
 		bytes_left -= bytes_handled;
-
-		fprintf(stderr, "[$] handled %d bytes, %d left\n", bytes_handled, bytes_left);
 	} while (bytes_left > 0);
 
 	return 0;
@@ -339,8 +340,6 @@ static int handle_pipe(struct incoming_pipe *p)
 		break;
 	}
 
-	fprintf(stderr, "[+] queueing a read...\n");
-
 queue_read:
 	res = ReadFile(
 		p->pipe,
@@ -350,7 +349,6 @@ queue_read:
 		&p->ov);
 
 	if (res && p->read.nbytes > 0) {
-		fprintf(stderr, "[!] immediate return (\'read\' is super effective!)\n");
 		handle_read(p);
 		goto queue_read;
 	}
@@ -376,8 +374,6 @@ queue_read:
 static void read_loop()
 {
 	int which;
-
-	fprintf(stderr, "\n[+] supervisor: read_loop() start\n");
 
 	for (;;) {
 		which = WaitForMultipleObjects(
