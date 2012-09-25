@@ -75,10 +75,14 @@ int main(int argc, char **argv)
 	if (!(device = monome_open(argv[1])))
 		return EXIT_FAILURE;
 
-#ifndef WIN32
+#ifdef WIN32
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+#else
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
 #endif
 
+	sosc_zeroconf_init();
 	sosc_server_run(device);
 	monome_close(device);
 

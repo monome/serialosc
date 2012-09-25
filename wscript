@@ -102,33 +102,16 @@ def check_libmonome(conf):
 
 def check_dnssd_win(conf):
 	conf.check_cc(
-		define_name="HAVE_DNSSD",
 		mandatory=True,
-		quote=0,
-
-		execute=True,
-
-		lib="dnssd",
 		header_name="dns_sd.h",
-		libpath=["c:/windows/system32"],
 		includes=["c:/program files/bonjour sdk/include"],
-		uselib_store="DNSSD",
+		uselib_store="DNSSD_INC")
 
-		msg="Checking for dnssd")
 
 def check_dnssd(conf):
 	conf.check_cc(
-		define_name="HAVE_DNSSD",
 		mandatory=True,
-		quote=0,
-
-		execute=True,
-
-		lib="dns_sd",
-		header_name="dns_sd.h",
-		uselib_store="DNSSD",
-
-		msg="Checking for dnssd")
+		header_name="dns_sd.h")
 
 #
 # waf stuff
@@ -177,6 +160,7 @@ def configure(conf):
 		check_dnssd_win(conf)
 	elif conf.env.DEST_OS != "darwin":
 		check_dnssd(conf)
+		conf.check_cc(lib='dl', uselib_store='DL', mandatory=True)
 
 	separator()
 

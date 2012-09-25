@@ -64,4 +64,8 @@ int sosc_config_write(const char *serial, sosc_state_t *state);
 
 void sosc_port_itos(char *dest, long int port);
 
+void sosc_zeroconf_init();
+void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name);
+void sosc_zeroconf_unregister(sosc_state_t *state);
+
 #endif /* defined SERIALOSC_H */
