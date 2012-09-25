@@ -151,6 +151,7 @@ def configure(conf):
 	separator()
 	conf.load("compiler_c")
 	conf.load("gnu_dirs")
+	conf.load("winres")
 
 	if conf.env.DEST_OS == "win32":
 		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
@@ -190,10 +191,12 @@ def configure(conf):
 		conf.define("WIN32", 1)
 		conf.env.append_unique("LIB_LO", "ws2_32")
 		conf.env.append_unique("LINKFLAGS", ["-Wl,--enable-stdcall-fixup"])
+		conf.env.append_unique("WINRCFLAGS", ["-O", "coff"])
 	elif conf.env.DEST_OS == "darwin":
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.5"])
 		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.5"])
 
+	conf.env.VERSION = VERSION
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
 def build(bld):
