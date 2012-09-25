@@ -134,9 +134,9 @@ def configure(conf):
 	separator()
 	conf.load("compiler_c")
 	conf.load("gnu_dirs")
-	conf.load("winres")
 
 	if conf.env.DEST_OS == "win32":
+		conf.load("winres")
 		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
 		conf.env.append_unique("CFLAGS", conf.env.CPPPATH_ST % conf.env.INCLUDEDIR)
 
