@@ -75,10 +75,7 @@ int main(int argc, char **argv)
 	if (!(device = monome_open(argv[1])))
 		return EXIT_FAILURE;
 
-#ifdef WIN32
-	setvbuf(stdout, NULL, _IONBF, 0);
-	setvbuf(stderr, NULL, _IONBF, 0);
-#else
+#ifndef WIN32
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
 #endif
 

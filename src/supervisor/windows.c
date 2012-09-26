@@ -38,6 +38,8 @@
 #define PIPE_BUF         128
 #define SOSC_DEVICE_PIPE (SOSC_PIPE_PREFIX "devices")
 
+#define MAX_NOTIFICATION_ENDPOINTS 32
+
 #define MAX_DEVICES      32
 #define DETECTOR_EVENT   (MAX_DEVICES)
 #define OSC_EVENT        (MAX_DEVICES + 1)
@@ -77,9 +79,21 @@ struct supervisor_state {
 	const char *quoted_exec_path;
 };
 
+struct notification_endpoint {
+	char host[256];
+	char port[6];
+};
+
+struct notifications {
+	struct notification_endpoint endpoint[MAX_NOTIFICATION_ENDPOINTS];
+	int count;
+
+	int notified;
+};
+
 static struct supervisor_state state = {
 	.detector = {
-		.ov     = {0, 0, {{0, 0}}},
+		.ov = {0, 0, {{0, 0}}},
 	}
 };
 
@@ -236,6 +250,11 @@ struct incoming_pipe pipe_info[MAX_DEVICES] = {
 	}
 };
 
+struct notifications notifications = {
+	.count    = 0,
+	.notified = 0,
+};
+
 /*************************************************************************
  * osc stuff
  *************************************************************************/
@@ -278,6 +297,30 @@ OSC_HANDLER_FUNC(list_devices)
 	return 0;
 }
 
+OSC_HANDLER_FUNC(add_notification_endpoint)
+{
+	struct notification_endpoint *n;
+
+	if (notifications.count >= MAX_NOTIFICATION_ENDPOINTS)
+		return 1;
+
+	n = &notifications.endpoint[notifications.count];
+
+	portstr(n->port, argv[1]->i);
+	strncpy(n->host, &argv[0]->s, sizeof(n->host));
+	n->host[sizeof(n->host) - 1] = '\0';
+
+	notifications.count++;
+	return 0;
+}
+
+static void reset_notifications()
+{
+	if (notifications.notified)
+		notifications.notified = 
+			notifications.count = 0;
+}
+
 static void osc_error(int num, const char *msg, const char *where)
 {
 	fprintf(stderr, "[!] osc server error %d, \"%s\" (%s)", num, msg, where);
@@ -297,6 +340,8 @@ static int init_osc_server()
 
 	lo_server_add_method(
 		state.srv, "/serialosc/list", "si", list_devices, NULL);
+	lo_server_add_method(
+		state.srv, "/serialosc/notify", "si", add_notification_endpoint, NULL);
 
 	return 0;
 
@@ -310,6 +355,44 @@ err_server_new:
  * supervisor read loop
  *************************************************************************/
 
+static int notify(struct incoming_pipe *p, sosc_ipc_type_t type)
+{
+	struct notification_endpoint *e;
+	lo_address dst;
+	char *path;
+	int i;
+
+	switch (type) {
+	case SOSC_DEVICE_CONNECTION:
+	case SOSC_DEVICE_READY:
+		path = "/serialosc/add";
+		break;
+
+	case SOSC_DEVICE_DISCONNECTION:
+		path = "/serialosc/remove";
+		break;
+
+	default:
+		return 1;
+	}
+
+	for (i = 0; i < notifications.count; i++) {
+		e = &notifications.endpoint[i];
+
+		if (!(dst = lo_address_new(e->host, e->port))) {
+			fprintf(stderr, "notify(): couldn't allocate lo_address\n");
+			continue;
+		}
+
+		lo_send_from(dst, state.srv, LO_TT_IMMEDIATE, path, "ssi",
+					 p->info.serial, p->info.friendly, p->info.port);
+
+		lo_address_free(dst);
+	}
+
+	notifications.notified++;
+	return 0;
+}
 static int handle_disconnect(struct incoming_pipe *p)
 {
 	DisconnectNamedPipe(p->pipe);
@@ -356,10 +439,14 @@ static int handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 	case SOSC_DEVICE_READY:
 		fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
 				p->info.serial, p->info.port);
+
 		p->status = READY;
+		notify(p, msg->type);
 		break;
 
 	case SOSC_DEVICE_DISCONNECTION:
+		p->status = NOT_READY;
+		notify(p, msg->type);
 		break;
 
 	case SOSC_OSC_PORT_CHANGE:
@@ -497,6 +584,8 @@ static void read_loop()
 					"(device pipe %d: %ld)\n", which, GetLastError());
 			break;
 		}
+
+		reset_notifications();
 	}
 }
 

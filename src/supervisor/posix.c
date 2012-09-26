@@ -159,8 +159,10 @@ static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
 	if (!(srv = lo_server_new(SOSC_SUPERVISOR_OSC_PORT, NULL)))
 		return NULL;
 
-	lo_server_add_method(srv, "/serialosc/list", "si", dsc_list_devices, devs);
-	lo_server_add_method(srv, "/serialosc/update", "si", add_notification_endpoint, devs);
+	lo_server_add_method(
+		srv, "/serialosc/list", "si", dsc_list_devices, devs);
+	lo_server_add_method(
+		srv, "/serialosc/notify", "si", add_notification_endpoint, devs);
 
 	return srv;
 }
