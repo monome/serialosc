@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import subprocess
 import time
 import sys
 
@@ -8,8 +9,12 @@ out = "build"
 
 # change this stuff
 
+def version_from_latest_git_tag():
+	return subprocess.check_output([
+		"git", "describe", "--abbrev=0", "--tags"]).decode().strip()
+
 APPNAME = "serialosc"
-VERSION = "1.1"
+VERSION = version_from_latest_git_tag()
 
 #
 # dep checking functions

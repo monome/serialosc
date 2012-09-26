@@ -1,8 +1,14 @@
 #!/usr/bin/env python
 
 import subprocess
+import re
 
 top = ".."
+
+non_decimal = re.compile(r"[^\d.]+")
+
+def strip_non_numeric(s):
+	return non_decimal.sub("", s)
 
 def win_version_string(version):
 	"""FILEVERSION and PRODUCTVERSION in .rc files look like:
@@ -13,7 +19,7 @@ def win_version_string(version):
 	this function turns a normal version string (like "1.1") into
 	a windowsy one."""
 
-	v = version.split(".")
+	v = strip_non_numeric(version).split(".")
 	pad = ["0" for x in range(4 - len(v))]
 
 	v.extend(pad)
