@@ -21,7 +21,7 @@
 #include "serialosc.h"
 
 
-int event_loop(const sosc_state_t *state) {
+int sosc_event_loop(const sosc_state_t *state) {
 	fd_set rfds, efds;
 	int maxfd, mfd, lofd;
 

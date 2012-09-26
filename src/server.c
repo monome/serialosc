@@ -16,6 +16,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <time.h>
 
@@ -31,6 +32,7 @@
 
 #include "serialosc.h"
 #include "osc.h"
+#include "ipc.h"
 
 
 #define DEFAULT_OSC_PREFIX      "/monome"
@@ -102,20 +104,98 @@ static void send_connection_status(sosc_state_t *state, int status) {
 	lo_send_from(state->outgoing, state->server, LO_TT_IMMEDIATE, cmd, "");
 }
 
-static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
-                   DNSServiceErrorType errorCode, const char *name,
-                   const char *regtype, const char *domain, void *context) {
+#ifndef WIN32
+/* not windows */
+static void send_simple_ipc(int fd, sosc_ipc_type_t type)
+{
+	sosc_ipc_msg_t msg = {
+		.type = type
+	};
 
-	/* on OSX, the bonjour library insists on having a callback passed to
-	   DNSServiceRegister. */
-
-	return;
-
+	sosc_ipc_msg_write(fd, &msg);
 }
 
-void server_run(monome_t *monome) {
-	sosc_state_t state = { .monome = monome };
+static void send_device_info(int fd, monome_t *monome)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_INFO,
+	};
+
+	msg.device_info.serial = (char *) monome_get_serial(monome);
+	msg.device_info.friendly = (char *) monome_get_friendly_name(monome);
+
+	sosc_ipc_msg_write(fd, &msg);
+}
+
+static void send_osc_port_change(int fd, uint16_t port)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_OSC_PORT_CHANGE,
+	};
+
+	msg.port_change.port = port;
+
+	sosc_ipc_msg_write(fd, &msg);
+}
+#else
+/* windows. */
+static void send_ipc_msg(sosc_ipc_msg_t *msg)
+{
+	HANDLE p = (HANDLE) _get_osfhandle(STDOUT_FILENO);
+	uint8_t buf[64];
+	DWORD written;
+	ssize_t bufsiz;
+
+	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), msg);
+
+	if (bufsiz < 0) {
+		fprintf(stderr, "[-] couldn't serialize msg\n");
+		return;
+	}
+
+	WriteFile(p, buf, bufsiz, &written, NULL);
+}
+
+static void send_simple_ipc(int fd, sosc_ipc_type_t type)
+{
+	sosc_ipc_msg_t msg = {
+		.type = type
+	};
+
+	send_ipc_msg(&msg);
+}
+
+static void send_device_info(int fd, monome_t *monome)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_INFO,
+	};
+
+	msg.device_info.serial = (char *) monome_get_serial(monome);
+	msg.device_info.friendly = (char *) monome_get_friendly_name(monome);
+
+	send_ipc_msg(&msg);
+}
+
+static void send_osc_port_change(int fd, uint16_t port)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_OSC_PORT_CHANGE,
+	};
+
+	msg.port_change.port = port;
+
+	send_ipc_msg(&msg);
+}
+#endif
+
+void sosc_server_run(monome_t *monome)
+{
 	char *svc_name;
+	sosc_state_t state = {
+		.monome = monome,
+		.ipc_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
+	};
 
 	if( sosc_config_read(monome_get_serial(state.monome), &state.config) ) {
 		fprintf(
@@ -146,22 +226,6 @@ void server_run(monome_t *monome) {
 		goto err_svc_name;
 	}
 
-	DNSServiceRegister(
-		/* sdref          */  &state.ref,
-		/* interfaceIndex */  0,
-		/* flags          */  0,
-		/* name           */  svc_name,
-		/* regtype        */  "_monome-osc._udp",
-		/* domain         */  NULL,
-		/* host           */  NULL,
-		/* port           */  htons(lo_server_get_port(state.server)),
-		/* txtLen         */  0,
-		/* txtRecord      */  NULL,
-		/* callBack       */  mdns_callback,
-		/* context        */  NULL);
-
-	free(svc_name);
-
 #define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
 	HANDLE(MONOME_BUTTON_DOWN, handle_press);
 	HANDLE(MONOME_BUTTON_UP, handle_press);
@@ -177,17 +241,31 @@ void server_run(monome_t *monome) {
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
 
-	fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
-	        monome_get_serial(state.monome), lo_server_get_port(state.server));
+	if (state.ipc_fd < 0) {
+		fprintf(
+			stderr, "serialosc [%s]: connected, server running on port %d\n",
+			monome_get_serial(state.monome), lo_server_get_port(state.server));
+	} else {
+		send_device_info(state.ipc_fd, monome);
+		send_osc_port_change(
+			state.ipc_fd, lo_server_get_port(state.server));
+		send_simple_ipc(state.ipc_fd, SOSC_DEVICE_READY);
+	}
+
+	sosc_zeroconf_register(&state, svc_name);
+	free(svc_name);
 
 	send_connection_status(&state, 1);
-	event_loop(&state);
+	sosc_event_loop(&state);
 	send_connection_status(&state, 0);
 
-	fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
-	        monome_get_serial(state.monome));
+	sosc_zeroconf_unregister(&state);
 
-	DNSServiceRefDeallocate(state.ref);
+	if (state.ipc_fd < 0) {
+		fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
+				monome_get_serial(state.monome));
+	} else
+		send_simple_ipc(state.ipc_fd, SOSC_DEVICE_DISCONNECTION);
 
 	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
 		fprintf(

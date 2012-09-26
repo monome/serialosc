@@ -16,6 +16,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 /* for RegisterDeviceNotification */
 #define WINVER 0x501
@@ -24,23 +25,21 @@
 #include <process.h>
 #include <Winreg.h>
 #include <Dbt.h>
+#include <io.h>
 
 #include "serialosc.h"
-
+#include "ipc.h"
 
 #define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
-#define SERVICE_NAME "serialosc"
 
-typedef struct {
-	HANDLE reaper_job;
+struct detector_state {
+	HANDLE pipe_to_supervisor;
+
 	SERVICE_STATUS svc_status;
 	SERVICE_STATUS_HANDLE hstatus;
+};
 
-	char *exec_path;
-	const char *quoted_exec_path;
-} detector_state_t;
-
-detector_state_t state = {
+static struct detector_state state = {
 	.svc_status = {
 		.dwServiceType = SERVICE_WIN32,
 		.dwCurrentState = SERVICE_START_PENDING,
@@ -52,23 +51,29 @@ detector_state_t state = {
 	}
 };
 
-static int spawn_server(const char *devnode) {
-	intptr_t proc;
+void send_connect(char *port)
+{
+	uint8_t buf[64];
+	DWORD written;
+	size_t bufsiz;
 
-	proc = _spawnlp(_P_NOWAIT, state.exec_path, state.quoted_exec_path,
-                    devnode, NULL);
+	sosc_ipc_msg_t m = {
+		.type = SOSC_DEVICE_CONNECTION,
+		.connection = {.devnode = port}
+	};
 
-	if( proc < 0 ) {
-		perror("dang");
-		return 1;
+	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), &m);
+
+	if (bufsiz < 0) {
+		fprintf(stderr, "[-] couldn't serialize msg\n");
+		return;
 	}
 
-	AssignProcessToJobObject(state.reaper_job, (HANDLE) proc);
-
-	return 0;
+	WriteFile(state.pipe_to_supervisor, buf, bufsiz, &written, NULL);
 }
 
-int scan_connected_devices() {
+int scan_connected_devices()
+{
 	HKEY key, subkey;
 	char subkey_name[MAX_PATH], *subkey_path;
 	unsigned char port_name[64];
@@ -129,7 +134,7 @@ int scan_connected_devices() {
 			goto next;
 		}
 
-		spawn_server((char *) port_name);
+		send_connect((char *) port_name);
 
 next:
 		RegCloseKey(subkey);
@@ -140,52 +145,16 @@ done:
 	return 0;
 }
 
-char *get_service_binpath() {
-	SC_HANDLE manager, service;
-	LPQUERY_SERVICE_CONFIG config;
-	DWORD config_size;
-	char *bin_path;
-
-	if( !(manager = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE)) )
-		goto err_manager;
-
-	if( !(service = OpenService(manager, SERVICE_NAME, SERVICE_QUERY_CONFIG)) )
-		goto err_service;
-
-	QueryServiceConfig(service, NULL, 0, &config_size);
-
-	if( !(config = s_malloc(config_size)) )
-		goto err_malloc;
-
-	if( !QueryServiceConfig(service, config, config_size, &config_size) )
-		goto err_query;
-
-	bin_path = s_strdup(config->lpBinaryPathName);
-	s_free(config);
-
-	CloseServiceHandle(service);
-	CloseServiceHandle(manager);
-	return bin_path;
-
-err_query:
-	s_free(config);
-err_malloc:
-	CloseServiceHandle(service);
-err_service:
-	CloseServiceHandle(manager);
-err_manager:
-	return NULL;
-}
-
-char *ftdishit_to_port(char *bullshit) {
+char *ftdishit_to_port(char *bullshit)
+{
 	char *subkey_path, *port, port_name[64];
 	DWORD plen, ptype;
 	HKEY subkey;
 
-	if( !(bullshit = strchr(bullshit, '#')) )
-		return NULL;
+	if (!(bullshit = strchr(bullshit, '#')))
+	    return NULL;
 
-	if( !(port = strchr(++bullshit, '#')) )
+	if (!(port = strchr(++bullshit, '#')))
 		return NULL;
 
 	*port = '\0';
@@ -193,9 +162,9 @@ char *ftdishit_to_port(char *bullshit) {
 	subkey_path = s_asprintf(FTDI_REG_PATH "\\%s\\0000\\Device Parameters",
 	                         bullshit);
 
-	switch( RegOpenKeyEx(
+	switch (RegOpenKeyEx(
 	        HKEY_LOCAL_MACHINE, subkey_path,
-	        0, KEY_READ, &subkey) ) {
+	        0, KEY_READ, &subkey)) {
 	case ERROR_SUCCESS:
 		break;
 
@@ -208,8 +177,8 @@ char *ftdishit_to_port(char *bullshit) {
 
 	plen = sizeof(port_name) / sizeof(char);
 	ptype = REG_SZ;
-	switch( RegQueryValueEx(subkey, "PortName", 0, &ptype,
-	                        (unsigned char *) port_name, &plen) ) {
+	switch (RegQueryValueEx(subkey, "PortName", 0, &ptype,
+	                        (unsigned char *) port_name, &plen)) {
 	case ERROR_SUCCESS:
 		port_name[plen] = '\0';
 		break;
@@ -223,7 +192,8 @@ char *ftdishit_to_port(char *bullshit) {
 	return s_strdup(port_name);
 }
 
-DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
+DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
+{
 	DEV_BROADCAST_DEVICEINTERFACE *dev;
 	char devname[256], *port;
 
@@ -246,7 +216,7 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
 			wcstombs(devname, (wchar_t *) dev->dbcc_name, sizeof(devname));
 			port = ftdishit_to_port(devname);
 
-			spawn_server(port);
+			send_connect(port);
 
 			s_free(port);
 			break;
@@ -263,28 +233,8 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx) {
 	return ERROR_CALL_NOT_IMPLEMENTED;
 }
 
-/* damnit mingw */
-#ifndef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-#define JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 0x00002000
-#endif
-
-int setup_reaper_job() {
-	JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli;
-	memset(&jeli, '\0', sizeof(jeli));
-
-	if( !(state.reaper_job = CreateJobObject(NULL, NULL)) )
-		return 1;
-
-	jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-	if( !SetInformationJobObject(
-			state.reaper_job, JobObjectExtendedLimitInformation, &jeli,
-			sizeof(jeli)) )
-		return 1;
-
-	return 0;
-}
-
-int setup_device_notification() {
+int setup_device_notification()
+{
 	DEV_BROADCAST_DEVICEINTERFACE filter;
 	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
 		{0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73}};
@@ -301,9 +251,52 @@ int setup_device_notification() {
 	return 0;
 }
 
-void WINAPI service_main(DWORD argc, LPTSTR *argv) {
+static int open_pipe_to_supervisor()
+{
+	HANDLE p = NULL;
+	DWORD pipe_state;
+
+	do {
+		p = CreateFile(
+			SOSC_DETECTOR_PIPE,
+			GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
+
+		if (p != INVALID_HANDLE_VALUE)
+			break;
+			
+		switch (GetLastError()) {
+		case ERROR_FILE_NOT_FOUND:
+			Sleep(100);
+			continue;
+
+		default:
+			return -1;
+		}
+	} while (1);
+
+	pipe_state = PIPE_READMODE_MESSAGE;
+	SetNamedPipeHandleState(p, &pipe_state, NULL, NULL);
+
+	state.pipe_to_supervisor = p;
+
+	return 0;
+}
+
+static DWORD WINAPI supervisor_thread(LPVOID param)
+{
+	sosc_supervisor_run(NULL);
+	return 0;
+}
+
+void WINAPI service_main(DWORD argc, LPTSTR *argv)
+{
 	state.hstatus = RegisterServiceCtrlHandlerEx(
-		SERVICE_NAME, control_handler, NULL);
+		SOSC_WIN_SERVICE_NAME, control_handler, NULL);
 
 	if( !state.hstatus )
 		return;
@@ -311,40 +304,55 @@ void WINAPI service_main(DWORD argc, LPTSTR *argv) {
 	state.svc_status.dwCurrentState = SERVICE_RUNNING;
 	SetServiceStatus(state.hstatus, &state.svc_status);
 
-	if( !(state.exec_path = get_service_binpath()) )
-		goto err;
+	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
 
-	if( !(state.quoted_exec_path = s_asprintf("\"%s\"", state.exec_path)) ) {
-		fprintf(stderr, "detector_run() error: couldn't allocate memory\n");
-		goto err_asprintf;
-	}
+	if (open_pipe_to_supervisor())
+		goto err_supervisor_pipe;
 
-	if( setup_reaper_job() )
+	if (setup_device_notification())
 		goto err_rdnotification;
 
 	scan_connected_devices(&state);
-
-	if( setup_device_notification() )
-		goto err_rdnotification;
-
 	return;
 
 err_rdnotification:
-err_asprintf:
-	s_free(state.exec_path);
-err:
+	CloseHandle(state.pipe_to_supervisor);
+err_supervisor_pipe:
 	state.svc_status.dwCurrentState = SERVICE_STOPPED;
 	state.svc_status.dwWin32ExitCode = 1;
 	SetServiceStatus(state.hstatus, &state.svc_status);
 	return;
 }
 
-int detector_run(const char *exec_path) {
+void debug_main()
+{
+	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
+	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
+
+	open_pipe_to_supervisor();
+	scan_connected_devices();
+
+	while(1)
+		Sleep(10000);
+}
+
+int sosc_detector_run(const char *exec_path)
+{
 	SERVICE_TABLE_ENTRY services[] = {
-		{SERVICE_NAME, service_main},
+		{SOSC_WIN_SERVICE_NAME, service_main},
 		{NULL, NULL}
 	};
 
-	StartServiceCtrlDispatcher(services);
+	if (!StartServiceCtrlDispatcher(services)) {
+		switch (GetLastError()) {
+		case ERROR_FAILED_SERVICE_CONTROLLER_CONNECT:
+			debug_main();
+			break;
+
+		default:
+			break;
+		}
+	}
+
 	return 0;
 }

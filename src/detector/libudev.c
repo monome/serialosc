@@ -20,7 +20,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <signal.h>
 #include <unistd.h>
 #include <errno.h>
 #include <poll.h>
@@ -29,41 +28,23 @@
 #include <monome.h>
 
 #include "serialosc.h"
+#include "ipc.h"
 
 
 typedef struct {
 	struct udev *u;
 	struct udev_monitor *um;
-
-	const char *exec_path;
 } detector_state_t;
 
 
-static void disable_subproc_waiting() {
-	struct sigaction s;
+static void send_connect(const char *devnode)
+{
+	sosc_ipc_msg_t msg = {
+		.type = SOSC_DEVICE_CONNECTION,
+		.connection = {.devnode = (char *) devnode}
+	};
 
-	memset(&s, 0, sizeof(struct sigaction));
-	s.sa_flags = SA_NOCLDWAIT;
-	s.sa_handler = SIG_IGN;
-
-	if( sigaction(SIGCHLD, &s, NULL) < 0 ) {
-		perror("disable_subproc_waiting");
-		exit(EXIT_FAILURE);
-	}
-}
-
-static int spawn_server(const char *exec_path, const char *devnode) {
-	switch( fork() ) {
-	case 0:  break;
-	case -1: perror("spawn_server fork"); return 1;
-	default: return 0;
-	}
-
-	execlp(exec_path, exec_path, devnode, NULL);
-
-	/* only get here if an error occurs */
-	perror("spawn_server execlp");
-	return 1;
+	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
 static monome_t *monitor_attach(detector_state_t *state) {
@@ -90,7 +71,7 @@ static monome_t *monitor_attach(detector_state_t *state) {
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
 		if( *(udev_device_get_action(ud)) == 'a' )
-			spawn_server(state->exec_path, udev_device_get_devnode(ud));
+			send_connect(udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
 	} while( 1 );
@@ -116,7 +97,7 @@ int scan_connected_devices(detector_state_t *state) {
 			state->u, udev_list_entry_get_name(cursor));
 
 		if( (devnode = udev_device_get_devnode(ud)) )
-			spawn_server(state->exec_path, devnode);
+			send_connect(devnode);
 
 		udev_device_unref(ud);
 	} while( (cursor = udev_list_entry_get_next(cursor)) );
@@ -125,13 +106,9 @@ int scan_connected_devices(detector_state_t *state) {
 	return 0;
 }
 
-int detector_run(const char *exec_path) {
-	detector_state_t state = {
-		.exec_path = exec_path
-	};
+int sosc_detector_run(const char *exec_path) {
+	detector_state_t state;
 
-	assert(exec_path);
-	disable_subproc_waiting();
 	state.u = udev_new();
 
 	if( scan_connected_devices(&state) )

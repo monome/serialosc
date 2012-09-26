@@ -23,6 +23,9 @@
 
 #include "platform.h"
 
+#define SOSC_SUPERVISOR_OSC_PORT "12002"
+#define SOSC_WIN_SERVICE_NAME "serialosc"
+
 typedef struct {
 	struct {
 		char port[6];
@@ -43,16 +46,17 @@ typedef struct {
 	monome_t *monome;
 	lo_address *outgoing;
 	lo_server *server;
+	int ipc_fd;
 
 	DNSServiceRef ref;
 
 	sosc_config_t config;
 } sosc_state_t;
 
-int event_loop(const sosc_state_t *state);
-
-int detector_run(const char *exec);
-void server_run(monome_t *monome);
+int  sosc_event_loop(const sosc_state_t *state);
+int  sosc_detector_run(const char *exec);
+void sosc_server_run(monome_t *monome);
+int  sosc_supervisor_run(char *progname);
 
 int sosc_config_create_directory();
 int sosc_config_read(const char *serial, sosc_config_t *config);
@@ -60,4 +64,8 @@ int sosc_config_write(const char *serial, sosc_state_t *state);
 
 void sosc_port_itos(char *dest, long int port);
 
-#endif /* defined __SERIALOSC_H_ */
+void sosc_zeroconf_init();
+void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name);
+void sosc_zeroconf_unregister(sosc_state_t *state);
+
+#endif /* defined SERIALOSC_H */

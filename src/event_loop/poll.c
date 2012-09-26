@@ -21,7 +21,7 @@
 #include "serialosc.h"
 
 
-int event_loop(const sosc_state_t *state) {
+int sosc_event_loop(const sosc_state_t *state) {
 	struct pollfd fds[2];
 
 	fds[0].fd = monome_get_fd(state->monome);

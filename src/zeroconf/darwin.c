@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2012 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,29 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <stdlib.h>
-#include <sys/stat.h>
+#include <dns_sd.h>
 
-#include "platform.h"
+#include "serialosc.h"
+#include "zeroconf.h"
 
-char *sosc_get_config_directory() {
-	return s_asprintf("%s/Library/Preferences/org.monome.serialosc",
-					  getenv("HOME"));
-}
-
-int sosc_config_create_directory() {
-	struct stat buf[1];
-	char *cdir;
-
-	cdir = sosc_get_config_directory();
-
-	if( stat(cdir, buf) && mkdir(cdir, S_IRWXU) )
-		goto err_mkdir;
-
-	s_free(cdir);
-	return 0;
-
-err_mkdir:
-	s_free(cdir);
-	return 1;
+void sosc_zeroconf_init()
+{
+	sosc_dnssd_registration_func = DNSServiceRegister;
+	sosc_dnssd_deallocation_func = DNSServiceRefDeallocate;
 }

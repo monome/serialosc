@@ -1,6 +1,23 @@
 #!/usr/bin/env python
 
+import subprocess
+
 top = ".."
+
+def win_version_string(version):
+	"""FILEVERSION and PRODUCTVERSION in .rc files look like:
+
+		FILEVERSION    1,0,0,0
+		PRODUCTVERSION 1,0,0,0
+
+	this function turns a normal version string (like "1.1") into
+	a windowsy one."""
+
+	v = version.split(".")
+	pad = ["0" for x in range(4 - len(v))]
+
+	v.extend(pad)
+	return ",".join(v[:4])
 
 def build(bld):
 	bld(export_includes="private", name="sosc_inc")
@@ -13,20 +30,46 @@ def build(bld):
 	#
 
 	if bld.env.DEST_OS[:3] == "win":
+		bld(
+			source="platform/winres/serialosc.rc.in",
+			target="serialosc.rc",
+			features="subst",
+
+			install_path=None,
+
+			GIT_COMMIT=subprocess.check_output([
+				"git", "rev-parse", "--verify", "HEAD"]).decode().strip(),
+			WIN_VERSION=win_version_string(bld.env.VERSION),
+			VERSION=bld.env.VERSION)
+
+		bld(
+			features="winrc includes",
+			source="serialosc.rc",
+			target="serialosc.rc.o",
+	
+			includes="platform/winres")
+
+		obj("serialosc.rc.o")
+	
 		obj("platform/windows.c")
 		obj("detector/windows.c")
+		obj("supervisor/windows.c")
 		obj("event_loop/windows.c")
+		obj("zeroconf/windows.c")
 
 	else:
 		obj("platform/posix.c")
+		obj("supervisor/posix.c")
 
 		if bld.env.DEST_OS == "linux":
 			obj("platform/linux.c")
 			obj("detector/libudev.c")
+			obj("zeroconf/not_darwin.c")
 
 		elif bld.env.DEST_OS == "darwin":
 			obj("platform/darwin.c")
 			obj("detector/iokitlib.c")
+			obj("zeroconf/darwin.c")
 
 		if bld.is_defined("HAVE_WORKING_POLL"):
 			obj("event_loop/poll.c")
@@ -37,20 +80,24 @@ def build(bld):
 	#
 	# common
 	#
-	
+
+	obj("zeroconf/common.c")
+
 	obj("osc/mext_methods.c")
 	obj("osc/sys_methods.c")
 	obj("osc/util.c")
 
+	obj("ipc.c")
 	obj("util.c")
 	obj("server.c")
 	obj("config.c")
+
 	obj("serialosc.c")
 
 	if bld.env.DEST_OS == "darwin":
 		bld.program(
 			source=objs,
-			target="serialosc",
+			target="serialoscd",
 
 			use="sosc_inc LO UDEV CONFUSE LIBMONOME",
 			framework=["IOKit", "CoreFoundation"])
@@ -58,6 +105,6 @@ def build(bld):
 	else:
 		bld.program(
 			source=objs,
-			target="serialosc",
+			target="serialoscd",
 
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD")
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD_INC DL")

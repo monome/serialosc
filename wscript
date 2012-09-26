@@ -102,33 +102,16 @@ def check_libmonome(conf):
 
 def check_dnssd_win(conf):
 	conf.check_cc(
-		define_name="HAVE_DNSSD",
 		mandatory=True,
-		quote=0,
-
-		execute=True,
-
-		lib="dnssd",
 		header_name="dns_sd.h",
-		libpath=["c:/windows/system32"],
 		includes=["c:/program files/bonjour sdk/include"],
-		uselib_store="DNSSD",
+		uselib_store="DNSSD_INC")
 
-		msg="Checking for dnssd")
 
 def check_dnssd(conf):
 	conf.check_cc(
-		define_name="HAVE_DNSSD",
 		mandatory=True,
-		quote=0,
-
-		execute=True,
-
-		lib="dns_sd",
-		header_name="dns_sd.h",
-		uselib_store="DNSSD",
-
-		msg="Checking for dnssd")
+		header_name="dns_sd.h")
 
 #
 # waf stuff
@@ -152,6 +135,7 @@ def configure(conf):
 	conf.load("gnu_dirs")
 
 	if conf.env.DEST_OS == "win32":
+		conf.load("winres")
 		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
 		conf.env.append_unique("CFLAGS", conf.env.CPPPATH_ST % conf.env.INCLUDEDIR)
 
@@ -175,6 +159,7 @@ def configure(conf):
 		check_dnssd_win(conf)
 	elif conf.env.DEST_OS != "darwin":
 		check_dnssd(conf)
+		conf.check_cc(lib='dl', uselib_store='DL', mandatory=True)
 
 	separator()
 
@@ -188,12 +173,13 @@ def configure(conf):
 	if conf.env.DEST_OS == "win32":
 		conf.define("WIN32", 1)
 		conf.env.append_unique("LIB_LO", "ws2_32")
-		conf.env.append_unique("LIB_CONFUSE", "intl")
 		conf.env.append_unique("LINKFLAGS", ["-Wl,--enable-stdcall-fixup"])
+		conf.env.append_unique("WINRCFLAGS", ["-O", "coff"])
 	elif conf.env.DEST_OS == "darwin":
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.5"])
 		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.5"])
 
+	conf.env.VERSION = VERSION
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
 def build(bld):

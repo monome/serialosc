@@ -56,14 +56,13 @@ int sosc_config_create_directory() {
 	struct _stat buf[1];
 
 	cdir = sosc_get_config_directory();
-	if( !_stat(cdir, buf) )
-		return 0; /* all is well */
+	if( _stat(cdir, buf) ) {
+		if( mk_monome_dir(cdir) )
+			goto err_mkdir;
 
-	if( mk_monome_dir(cdir) )
-		goto err_mkdir;
-
-	if( _mkdir(cdir) )
-		goto err_mkdir;
+		if( _mkdir(cdir) )
+			goto err_mkdir;
+	}
 
 	s_free(cdir);
 	return 0;
