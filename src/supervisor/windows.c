@@ -124,24 +124,6 @@ static int overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
 	return 0;
 }
 
-#if 0
-int spawn_server(const char *devnode) {
-	intptr_t proc;
-
-	proc = _spawnlp(_P_NOWAIT, state.exec_path, state.quoted_exec_path,
-                    devnode, NULL);
-
-	if( proc < 0 ) {
-		perror("dang");
-		return 1;
-	}
-
-	AssignProcessToJobObject(state.reaper_job, (HANDLE) proc);
-
-	return 0;
-}
-#endif
-
 static HANDLE open_pipe_to_supervisor()
 {
 	SECURITY_ATTRIBUTES sattr;
