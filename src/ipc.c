@@ -1,10 +1,10 @@
 /**
  * Copyright (c) 2010-2011 William Light <wrl@illest.net>
- * 
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -43,9 +43,11 @@ static int read_strdata(int fd, size_t n, ...)
 		cur = va_arg(ap, const char **);
 		*cur = NULL;
 
-		read(fd, &slen, sizeof(slen));
+		if (read(fd, &slen, sizeof(slen)) < sizeof(slen))
+			return -1;
+
 		if (!(buf = s_calloc(slen + 1, sizeof(char)))) {
-			/* XXX: proper error handling? i.e. what do we do with the 
+			/* XXX: proper error handling? i.e. what do we do with the
 			        strings that are already allocated? we can't NULL
 			        all of them at the start, I guess that's up to the
 					caller? */
@@ -54,14 +56,14 @@ static int read_strdata(int fd, size_t n, ...)
 
 		if (read(fd, buf, slen) < slen) {
 			s_free(buf);
-			return 1;
+			return -1;
 		}
 
 		*cur = buf;
 
 		if (read(fd, &magic, sizeof(magic)) < sizeof(magic)
 			|| magic != IPC_MAGIC)
-			return 1;
+			return -1;
 	}
 
 	va_end(ap);
@@ -76,16 +78,27 @@ static int write_strdata(int fd, size_t n, ...)
 	size_t slen;
 	va_list ap;
 
+#define EMIT_BYTES(b, nb)          \
+	do {                           \
+		if (write(fd, b, nb) < nb) \
+			return -1;             \
+	} while (0)
+
+#define EMIT_VAR(v) EMIT_BYTES(&v, sizeof(v))
+
 	va_start(ap, n);
 	while (n--) {
 		cur = va_arg(ap, const char *);
 		slen = strlen(cur);
 
-		write(fd, &slen, sizeof(slen));
-		write(fd, cur, slen);
-		write(fd, &magic, sizeof(magic));
+		EMIT_VAR(slen);
+		EMIT_BYTES(cur, slen);
+		EMIT_VAR(magic);
 	}
 	va_end(ap);
+
+#undef EMIT_VAR
+#undef EMIT_BYTES
 
 	return 0;
 }
