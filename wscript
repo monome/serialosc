@@ -9,12 +9,8 @@ out = "build"
 
 # change this stuff
 
-def version_from_latest_git_tag():
-	return subprocess.check_output([
-		"git", "describe", "--abbrev=0", "--tags"]).decode().strip()
-
 APPNAME = "serialosc"
-VERSION = version_from_latest_git_tag()
+VERSION = "1.2a"
 
 #
 # dep checking functions
