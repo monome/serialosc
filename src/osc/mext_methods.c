@@ -1,10 +1,10 @@
 /**
  * Copyright (c) 2011 William Light <wrl@illest.net>
- * 
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -15,6 +15,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <lo/lo.h>
 #include <monome.h>
@@ -22,6 +23,16 @@
 #include "serialosc.h"
 #include "osc.h"
 
+static int coerce_arg_to_int(lo_type type, lo_arg *src)
+{
+	lo_arg dst;
+
+	if (!lo_coerce(LO_INT32, &dst, type, src))
+		return -1;
+
+	src->i = dst.i;
+	return 0;
+}
 
 OSC_HANDLER_FUNC(led_set_handler) {
 	monome_t *monome = user_data;
@@ -49,14 +60,14 @@ OSC_HANDLER_FUNC(led_col_handler) {
 	uint8_t buf[32];
 	int i;
 
-	if( argc < 3 || argc > 34 )
+	if (argc < 3 || argc > 34)
 		return 1;
 
-	for( i = 0; i < argc; i++ )
-		if( types[i] != 'i' ) /* only integers are invited to this party */
-			return 1;
+	for (i = 0; i < argc; i++)
+		if (coerce_arg_to_int(types[i], argv[i]))
+			return 1; /* only integers are invited to this party */
 
-	for( i = 0; i < (argc - 2); i++ )
+	for (i = 0; i < (argc - 2); i++)
 		buf[i] = argv[i + 2]->i;
 
 	return monome_led_col(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
@@ -67,14 +78,14 @@ OSC_HANDLER_FUNC(led_row_handler) {
 	uint8_t buf[32];
 	int i;
 
-	if( argc < 3 || argc > 34 )
+	if (argc < 3 || argc > 34)
 		return 1;
 
-	for( i = 0; i < argc; i++ )
-		if( types[i] != 'i' )
+	for (i = 0; i < argc; i++)
+		if (coerce_arg_to_int(types[i], argv[i]))
 			return 1;
 
-	for( i = 0; i < (argc - 2); i++ )
+	for (i = 0; i < (argc - 2); i++)
 		buf[i] = argv[i + 2]->i;
 
 	return monome_led_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
@@ -111,14 +122,14 @@ OSC_HANDLER_FUNC(led_level_col_handler) {
 	uint8_t buf[32];
 	int i;
 
-	if( argc < 3 || argc > 34 )
+	if (argc < 3 || argc > 34)
 		return 1;
 
-	for( i = 0; i < argc; i++ )
-		if( types[i] != 'i' ) /* only integers are invited to this party */
-			return 1;
+	for (i = 0; i < argc; i++)
+		if (coerce_arg_to_int(types[i], argv[i]))
+			return 1; /* only integers are invited to this party */
 
-	for( i = 0; i < (argc - 2); i++ )
+	for (i = 0; i < (argc - 2); i++)
 		buf[i] = argv[i + 2]->i;
 
 	return monome_led_level_col(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
@@ -129,14 +140,14 @@ OSC_HANDLER_FUNC(led_level_row_handler) {
 	uint8_t buf[32];
 	int i;
 
-	if( argc < 3 || argc > 34 )
+	if (argc < 3 || argc > 34)
 		return 1;
 
-	for( i = 0; i < argc; i++ )
-		if( types[i] != 'i' )
+	for (i = 0; i < argc; i++)
+		if (coerce_arg_to_int(types[i], argv[i]))
 			return 1;
 
-	for( i = 0; i < (argc - 2); i++ )
+	for (i = 0; i < (argc - 2); i++)
 		buf[i] = argv[i + 2]->i;
 
 	return monome_led_level_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
