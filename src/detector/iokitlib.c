@@ -101,7 +101,7 @@ static int init_iokitlib(notify_state_t *state) {
 	matching = IOServiceMatching(kIOSerialBSDServiceValue);
 	CFDictionarySetValue(matching,
 		CFSTR(kIOSerialBSDTypeKey),
-		CFSTR(kIOSerialBSDRS232Type));
+		CFSTR(kIOSerialBSDAllTypes));
 
 	IOServiceAddMatchingNotification(
 		/* notify port       */  state->notify,
