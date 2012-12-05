@@ -180,8 +180,15 @@ def configure(conf):
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.5"])
 		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.5"])
 
-	conf.env.VERSION = VERSION
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
+
+	conf.env.VERSION = VERSION
+	conf.define("VERSION", VERSION)
+	conf.define("GIT_COMMIT",
+		subprocess.check_output(["git", "rev-parse", "--verify", "--short", "HEAD"])
+			.decode().strip())
+
+	conf.write_config_header("config-autogen.h")
 
 def build(bld):
 	bld.recurse("src")
