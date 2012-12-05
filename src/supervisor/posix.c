@@ -213,6 +213,7 @@ static void read_detector_msgs(const char *progname, int fd)
 	int child_fd, i, notified;
 
 #define FD_COUNT (devs.count + 2)
+#define MONITOR_FD 1
 #define DEVINDEX(x) (x + 2)
 
 	disable_subproc_waiting();
@@ -225,8 +226,8 @@ static void read_detector_msgs(const char *progname, int fd)
 	fds[0].fd = lo_server_get_socket_fd(srv);
 	fds[0].events = POLLIN;
 
-	fds[1].fd = fd;
-	fds[1].events = POLLIN;
+	fds[MONITOR_FD].fd     = fd;
+	fds[MONITOR_FD].events = POLLIN;
 
 	do {
 		notified = 0;
@@ -240,6 +241,14 @@ static void read_detector_msgs(const char *progname, int fd)
 			lo_server_recv_noblock(srv, 0);
 
 		for (i = 1; i < FD_COUNT; i++) {
+			if (fds[i].revents & POLLERR || fds[i].revents & POLLHUP) {
+				if (i == MONITOR_FD) {
+					puts("serialoscd: monitor process disappeared, bailing out!");
+					return;
+				} else
+					goto disconnect;
+			}
+
 			if (!(fds[i].revents & POLLIN))
 				continue;
 
@@ -296,6 +305,7 @@ static void read_detector_msgs(const char *progname, int fd)
 				notified = 1;
 				break;
 
+disconnect:
 			case SOSC_DEVICE_DISCONNECTION:
 				fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
 						devs.info[i - 2]->serial);
