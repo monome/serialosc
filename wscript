@@ -188,7 +188,7 @@ def configure(conf):
 		subprocess.check_output(["git", "rev-parse", "--verify", "--short", "HEAD"])
 			.decode().strip())
 
-	conf.write_config_header("config-autogen.h")
+	conf.write_config_header("config-autogen.h", remove=False)
 
 def build(bld):
 	bld.recurse("src")
