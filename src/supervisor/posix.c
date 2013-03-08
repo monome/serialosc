@@ -246,7 +246,10 @@ static void read_detector_msgs(const char *progname, int fd)
 					puts("serialoscd: monitor process disappeared, bailing out!");
 					return;
 				} else
-					goto disconnect;
+					if (devs.info[i - 2]->ready)
+						goto disconnect_known;
+					else
+						goto disconnect_unknown;
 			}
 
 			if (!(fds[i].revents & POLLIN))
@@ -305,7 +308,7 @@ static void read_detector_msgs(const char *progname, int fd)
 				notified = 1;
 				break;
 
-disconnect:
+disconnect_known:
 			case SOSC_DEVICE_DISCONNECTION:
 				fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
 						devs.info[i - 2]->serial);
@@ -313,6 +316,7 @@ disconnect:
 				notify(SOSC_DEVICE_DISCONNECTION, devs.info[i - 2]);
 				notified = 1;
 
+disconnect_unknown:
 				/* close the fd and free the devinfo struct */
 				close(fds[i].fd);
 				s_free(devs.info[i - 2]->serial);

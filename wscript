@@ -125,6 +125,8 @@ def options(opt):
 
 	sosc_opts.add_option("--enable-multilib", action="store_true",
 			default=False, help="on Darwin, build serialosc as a combination 32 and 64 bit executable [disabled by default]")
+	sosc_opts.add_option("--disable-zeroconf", action="store_true",
+			default=False, help="disable all zeroconf code, including runtime loading of the DNSSD library.")
 
 def configure(conf):
 	# just for output prettifying
@@ -157,9 +159,11 @@ def configure(conf):
 	check_confuse(conf)
 
 	if conf.env.DEST_OS == "win32":
-		check_dnssd_win(conf)
+		if not conf.options.disable_zeroconf:
+			check_dnssd_win(conf)
 	elif conf.env.DEST_OS != "darwin":
-		check_dnssd(conf)
+		if not conf.options.disable_zeroconf:
+			check_dnssd(conf)
 		conf.check_cc(lib='dl', uselib_store='DL', mandatory=True)
 
 	separator()
@@ -180,6 +184,10 @@ def configure(conf):
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.5"])
 		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.5"])
 
+	if conf.options.disable_zeroconf:
+		conf.define("SOSC_NO_ZEROCONF", True)
+		conf.env.SOSC_NO_ZEROCONF = True
+
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
 	conf.env.VERSION = VERSION
@@ -191,6 +199,7 @@ def configure(conf):
 	conf.write_config_header("config-autogen.h", remove=False)
 
 def build(bld):
+	bld.get_config_header("config-autogen.h")
 	bld.recurse("src")
 
 def dist(dst):
