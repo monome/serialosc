@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,7 +33,7 @@ typedef enum {
 	SOSC_OSC_PORT_CHANGE
 } sosc_ipc_type_t;
 
-typedef struct {
+typedef struct sosc_ipc_msg {
 	sosc_ipc_type_t type;
 
 	__extension__ union {

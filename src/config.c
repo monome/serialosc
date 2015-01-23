@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,14 +59,18 @@ static cfg_opt_t opts[] = {
 };
 
 
-static void prepend_slash_if_necessary(char **dest, char *prefix) {
-	if( *prefix != '/' )
+static void
+prepend_slash_if_necessary(char **dest, char *prefix)
+{
+	if (*prefix != '/')
 		*dest = s_asprintf("/%s", prefix);
 	else
 		*dest = s_strdup(prefix);
 }
 
-static char *path_for_serial(const char *serial) {
+static char *
+path_for_serial(const char *serial)
+{
 	char *path, *cdir;
 
 	cdir = sosc_get_config_directory();
@@ -76,11 +80,13 @@ static char *path_for_serial(const char *serial) {
 	return path;
 }
 
-int sosc_config_read(const char *serial, sosc_config_t *config) {
+int
+sosc_config_read(const char *serial, sosc_config_t *config)
+{
 	cfg_t *cfg, *sec;
 	char *path;
 
-	if( !serial )
+	if (!serial)
 		return 1;
 
 	cfg = cfg_init(opts, CFGF_NOCASE);
@@ -111,19 +117,21 @@ int sosc_config_read(const char *serial, sosc_config_t *config) {
 	return 0;
 }
 
-int sosc_config_write(const char *serial, sosc_state_t *state) {
+int
+sosc_config_write(const char *serial, sosc_state_t *state)
+{
 	cfg_t *cfg, *sec;
 	char *path;
 	const char *p;
 	FILE *f;
 
-	if( !serial )
+	if (!serial)
 		return 1;
 
 	cfg = cfg_init(opts, CFGF_NOCASE);
 
 	path = path_for_serial(serial);
-	if( !(f = fopen(path, "w")) ) {
+	if (!(f = fopen(path, "w"))) {
 		s_free(path);
 		return 1;
 	}

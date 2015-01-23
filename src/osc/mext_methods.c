@@ -23,7 +23,8 @@
 #include "serialosc.h"
 #include "osc.h"
 
-static int coerce_arg_to_int(lo_type type, lo_arg *src)
+static int
+coerce_arg_to_int(lo_type type, lo_arg *src)
 {
 	lo_arg dst;
 
@@ -34,28 +35,32 @@ static int coerce_arg_to_int(lo_type type, lo_arg *src)
 	return 0;
 }
 
-OSC_HANDLER_FUNC(led_set_handler) {
+OSC_HANDLER_FUNC(led_set_handler)
+{
 	monome_t *monome = user_data;
 	return monome_led_set(monome, argv[0]->i, argv[1]->i, !!argv[2]->i);
 }
 
-OSC_HANDLER_FUNC(led_all_handler) {
+OSC_HANDLER_FUNC(led_all_handler)
+{
 	monome_t *monome = user_data;
 	return monome_led_all(monome, !!argv[0]->i);
 }
 
-OSC_HANDLER_FUNC(led_map_handler) {
+OSC_HANDLER_FUNC(led_map_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[8];
 	int i;
 
-	for( i = 0; i < 8; i++ )
+	for (i = 0; i < 8; i++)
 		buf[i] = argv[i + (argc - 8)]->i;
 
 	return monome_led_map(monome, argv[0]->i, argv[1]->i, buf);
 }
 
-OSC_HANDLER_FUNC(led_col_handler) {
+OSC_HANDLER_FUNC(led_col_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[32];
 	int i;
@@ -73,7 +78,8 @@ OSC_HANDLER_FUNC(led_col_handler) {
 	return monome_led_col(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
-OSC_HANDLER_FUNC(led_row_handler) {
+OSC_HANDLER_FUNC(led_row_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[32];
 	int i;
@@ -91,33 +97,38 @@ OSC_HANDLER_FUNC(led_row_handler) {
 	return monome_led_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
-OSC_HANDLER_FUNC(led_intensity_handler) {
+OSC_HANDLER_FUNC(led_intensity_handler)
+{
 	monome_t *monome = user_data;
 	return monome_led_intensity(monome, argv[0]->i);
 }
 
-OSC_HANDLER_FUNC(led_level_set_handler) {
+OSC_HANDLER_FUNC(led_level_set_handler)
+{
 	monome_t *monome = user_data;
 	return monome_led_level_set(monome, argv[0]->i, argv[1]->i, argv[2]->i);
 }
 
-OSC_HANDLER_FUNC(led_level_all_handler) {
+OSC_HANDLER_FUNC(led_level_all_handler)
+{
 	monome_t *monome = user_data;
 	return monome_led_level_all(monome, argv[0]->i);
 }
 
-OSC_HANDLER_FUNC(led_level_map_handler) {
+OSC_HANDLER_FUNC(led_level_map_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[64];
 	int i;
 
-	for( i = 0; i < 64; i++ )
+	for (i = 0; i < 64; i++)
 		buf[i] = argv[i + (argc - 64)]->i;
 
 	return monome_led_level_map(monome, argv[0]->i, argv[1]->i, buf);
 }
 
-OSC_HANDLER_FUNC(led_level_col_handler) {
+OSC_HANDLER_FUNC(led_level_col_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[32];
 	int i;
@@ -135,7 +146,8 @@ OSC_HANDLER_FUNC(led_level_col_handler) {
 	return monome_led_level_col(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
-OSC_HANDLER_FUNC(led_level_row_handler) {
+OSC_HANDLER_FUNC(led_level_row_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[32];
 	int i;
@@ -153,48 +165,53 @@ OSC_HANDLER_FUNC(led_level_row_handler) {
 	return monome_led_level_row(monome, argv[0]->i, argv[1]->i, argc - 2, buf);
 }
 
-OSC_HANDLER_FUNC(led_ring_set_handler) {
+OSC_HANDLER_FUNC(led_ring_set_handler)
+{
 	monome_t *monome = user_data;
-
 	return monome_led_ring_set(monome, argv[0]->i, argv[1]->i, argv[2]->i);
 }
 
-OSC_HANDLER_FUNC(led_ring_all_handler) {
+OSC_HANDLER_FUNC(led_ring_all_handler)
+{
 	monome_t *monome = user_data;
-
 	return monome_led_ring_all(monome, argv[0]->i, argv[1]->i);
 }
 
-OSC_HANDLER_FUNC(led_ring_map_handler) {
+OSC_HANDLER_FUNC(led_ring_map_handler)
+{
 	monome_t *monome = user_data;
 	uint8_t buf[64];
 	int i;
 
-	for( i = 0; i < 64; i++ )
+	for (i = 0; i < 64; i++)
 		buf[i] = argv[i + (argc - 64)]->i;
 
 	return monome_led_ring_map(monome, argv[0]->i, buf);
 }
 
-OSC_HANDLER_FUNC(led_ring_range_handler) {
+OSC_HANDLER_FUNC(led_ring_range_handler)
+{
 	monome_t *monome = user_data;
 
 	return monome_led_ring_range(monome, argv[0]->i, argv[1]->i, argv[2]->i, argv[3]->i);
 }
 
-OSC_HANDLER_FUNC(tilt_set_handler) {
+OSC_HANDLER_FUNC(tilt_set_handler)
+{
 	monome_t *monome = user_data;
 
-	if( argv[1]->i )
+	if (argv[1]->i)
 		return monome_tilt_enable(monome, argv[0]->i);
 	else
 		return monome_tilt_disable(monome, argv[0]->i);
 }
 
-#define METHOD(path) for( cmd_buf = osc_path(path, prefix); cmd_buf; \
-                          s_free(cmd_buf), cmd_buf = NULL )
+#define METHOD(path) for (cmd_buf = osc_path(path, prefix); cmd_buf; \
+                          s_free(cmd_buf), cmd_buf = NULL)
 
-void osc_register_methods(sosc_state_t *state) {
+void
+osc_register_methods(sosc_state_t *state)
+{
 	char *prefix, *cmd_buf;
 	monome_t *monome;
 	lo_server srv;
@@ -275,7 +292,9 @@ void osc_register_methods(sosc_state_t *state) {
 #undef REGISTER
 }
 
-void osc_unregister_methods(sosc_state_t *state) {
+void
+osc_unregister_methods(sosc_state_t *state)
+{
 	char *prefix, *cmd_buf;
 	lo_server srv;
 

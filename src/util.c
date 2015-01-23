@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,8 +19,10 @@
 /* convert a port int to either a zero-length string if 0 or
    a maximum 5 length string. */
 
-void sosc_port_itos(char *dest, long int port) {
-	if( port )
+void
+sosc_port_itos(char *dest, long int port)
+{
+	if (port)
 		snprintf(dest, sizeof(char) * 6, "%ld", port);
 	else
 		*dest = '\0';

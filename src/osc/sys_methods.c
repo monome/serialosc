@@ -1,10 +1,10 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
- * 
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -23,36 +23,38 @@
 #include "serialosc.h"
 #include "osc.h"
 
-
-/**
+/*************************************************************************
  * utils
- */
+ *************************************************************************/
 
-static int portstr(char *dest, int src) {
+static int
+portstr(char *dest, int src)
+{
 	return snprintf(dest, 6, "%d", src);
 }
 
-/**
+/*************************************************************************
  * /sys/info business
- */
+ *************************************************************************/
 
 typedef void (info_reply_func_t)(lo_address *, sosc_state_t *);
 
-static int info_prop_handler(lo_arg **argv, int argc, void *user_data,
+static int
+info_prop_handler(lo_arg **argv, int argc, void *user_data,
                               info_reply_func_t cb) {
 	sosc_state_t *state = user_data;
 	const char *host = NULL;
 	char port[6];
 	lo_address *dst;
 
-	if( argc == 2 )
+	if (argc == 2)
 		host = &argv[0]->s;
 	else
 		host = lo_address_get_hostname(state->outgoing);
 
 	portstr(port, argv[argc - 1]->i);
 
-	if( !(dst = lo_address_new(host, port)) ) {
+	if (!(dst = lo_address_new(host, port))) {
 		fprintf(stderr, "sys_info_handler(): error in lo_address_new()");
 		return 1;
 	}
@@ -63,7 +65,9 @@ static int info_prop_handler(lo_arg **argv, int argc, void *user_data,
 	return 0;
 }
 
-static int info_prop_handler_default(void *user_data, info_reply_func_t cb) {
+static int
+info_prop_handler_default(void *user_data, info_reply_func_t cb)
+{
 	sosc_state_t *state = user_data;
 	cb(state->outgoing, state);
 	return 0;
@@ -94,8 +98,10 @@ DECLARE_INFO_PROP(host, "s", lo_address_get_hostname(state->outgoing))
 DECLARE_INFO_PROP(port, "i", atoi(lo_address_get_port(state->outgoing)))
 DECLARE_INFO_PROP(prefix, "s", state->config.app.osc_prefix)
 
-static void info_reply_rotation(lo_address *to, sosc_state_t *state) {
-	if( monome_get_cols(state->monome) != monome_get_rows(state->monome) )
+static void
+info_reply_rotation(lo_address *to, sosc_state_t *state)
+{
+	if (monome_get_cols(state->monome) != monome_get_rows(state->monome))
 		info_reply_size(to, state);
 
 	lo_send_from(to, state->server, LO_TT_IMMEDIATE, "/sys/rotation", "i",
@@ -104,7 +110,9 @@ static void info_reply_rotation(lo_address *to, sosc_state_t *state) {
 
 DECLARE_INFO_HANDLERS(rotation);
 
-static void info_reply_all(lo_address *to, sosc_state_t *state) {
+static void
+info_reply_all(lo_address *to, sosc_state_t *state)
+{
 	info_reply_id(to, state);
 	info_reply_size(to, state);
 	info_reply_host(to, state);
@@ -113,24 +121,26 @@ static void info_reply_all(lo_address *to, sosc_state_t *state) {
 	info_reply_rotation(to, state);
 }
 
-OSC_HANDLER_FUNC(sys_info_handler) {
+OSC_HANDLER_FUNC(sys_info_handler)
+{
 	return info_prop_handler(argv, argc, user_data, info_reply_all);
 }
 
-OSC_HANDLER_FUNC(sys_info_handler_default) {
+OSC_HANDLER_FUNC(sys_info_handler_default)
+{
 	return info_prop_handler_default(user_data, info_reply_all);
 }
 
 /**/
- 
 
-OSC_HANDLER_FUNC(sys_cable_legacy_handler) {
+OSC_HANDLER_FUNC(sys_cable_legacy_handler)
+{
 	sosc_state_t *state = user_data;
 	monome_rotate_t new, old;
 
 	old = monome_get_rotation(state->monome);
 
-	switch( argv[0]->s ) {
+	switch (argv[0]->s) {
 	case 'L':
 	case 'l':
 	case '0':
@@ -159,7 +169,7 @@ OSC_HANDLER_FUNC(sys_cable_legacy_handler) {
 		return 1;
 	}
 
-	if( old == new )
+	if (old == new)
 		return 0;
 
 	monome_set_rotation(state->monome, new);
@@ -167,14 +177,15 @@ OSC_HANDLER_FUNC(sys_cable_legacy_handler) {
 	return 0;
 }
 
-OSC_HANDLER_FUNC(sys_rotation_handler) {
+OSC_HANDLER_FUNC(sys_rotation_handler)
+{
 	sosc_state_t *state = user_data;
 	monome_rotate_t new, old;
 
 	old = monome_get_rotation(state->monome);
 	new = argv[0]->i / 90;
 
-	if( old == new )
+	if (old == new)
 		return 0;
 
 	monome_set_rotation(state->monome, new);
@@ -182,14 +193,15 @@ OSC_HANDLER_FUNC(sys_rotation_handler) {
 	return 0;
 }
 
-OSC_HANDLER_FUNC(sys_port_handler) {
+OSC_HANDLER_FUNC(sys_port_handler)
+{
 	sosc_state_t *state = user_data;
 	lo_address *new, *old = state->outgoing;
 	char port[6];
 
 	portstr(port, argv[0]->i);
 
-	if( !(new = lo_address_new(lo_address_get_hostname(old), port)) ) {
+	if (!(new = lo_address_new(lo_address_get_hostname(old), port))) {
 		fprintf(stderr, "sys_port_handler(): error in lo_address_new()\n");
 		return 1;
 	}
@@ -204,11 +216,12 @@ OSC_HANDLER_FUNC(sys_port_handler) {
 	return 0;
 }
 
-OSC_HANDLER_FUNC(sys_host_handler) {
+OSC_HANDLER_FUNC(sys_host_handler)
+{
 	sosc_state_t *state = user_data;
 	lo_address *new, *old = state->outgoing;
 
-	if( !(new = lo_address_new(&argv[0]->s, lo_address_get_port(old))) ) {
+	if (!(new = lo_address_new(&argv[0]->s, lo_address_get_port(old)))) {
 		fprintf(stderr, "sys_host_handler(): error in lo_address_new()\n");
 		return 1;
 	}
@@ -223,11 +236,12 @@ OSC_HANDLER_FUNC(sys_host_handler) {
 	return 0;
 }
 
-OSC_HANDLER_FUNC(sys_prefix_handler) {
+OSC_HANDLER_FUNC(sys_prefix_handler)
+{
 	sosc_state_t *state = user_data;
 	char *new, *old = state->config.app.osc_prefix;
 
-	if( argv[0]->s != '/' )
+	if (argv[0]->s != '/')
 		/* prepend a slash */
 		new = s_asprintf("/%s", &argv[0]->s);
 	else
@@ -244,10 +258,12 @@ OSC_HANDLER_FUNC(sys_prefix_handler) {
 	return 0;
 }
 
-void osc_register_sys_methods(sosc_state_t *state) {
+void
+osc_register_sys_methods(sosc_state_t *state)
+{
 	char *cmd;
 
-#define METHOD(path) for( cmd = "/sys/" path; cmd; cmd = NULL )
+#define METHOD(path) for (cmd = "/sys/" path; cmd; cmd = NULL)
 #define REGISTER(types, handler, context) \
 	lo_server_add_method(state->server, cmd, types, handler, context)
 #define REGISTER_INFO_PROP(prop) do {\

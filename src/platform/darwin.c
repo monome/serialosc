@@ -19,18 +19,22 @@
 
 #include "platform.h"
 
-char *sosc_get_config_directory() {
+char *
+sosc_get_config_directory(void)
+{
 	return s_asprintf("%s/Library/Preferences/org.monome.serialosc",
 					  getenv("HOME"));
 }
 
-int sosc_config_create_directory() {
+int
+sosc_config_create_directory(void)
+{
 	struct stat buf[1];
 	char *cdir;
 
 	cdir = sosc_get_config_directory();
 
-	if( stat(cdir, buf) && mkdir(cdir, S_IRWXU) )
+	if (stat(cdir, buf) && mkdir(cdir, S_IRWXU))
 		goto err_mkdir;
 
 	s_free(cdir);

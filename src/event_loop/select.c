@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,8 +20,9 @@
 
 #include "serialosc.h"
 
-
-int sosc_event_loop(const sosc_state_t *state) {
+int
+sosc_event_loop(const sosc_state_t *state)
+{
 	fd_set rfds, efds;
 	int maxfd, mfd, lofd;
 
@@ -29,7 +30,7 @@ int sosc_event_loop(const sosc_state_t *state) {
 	lofd = lo_server_get_socket_fd(state->server);
 	maxfd = ((lofd > mfd) ? lofd : mfd) + 1;
 
-	do {
+	for (;;) {
 		FD_ZERO(&rfds);
 		FD_SET(mfd, &rfds);
 		FD_SET(lofd, &rfds);
@@ -38,8 +39,8 @@ int sosc_event_loop(const sosc_state_t *state) {
 		FD_SET(mfd, &efds);
 
 		/* block until either the monome or liblo have data */
-		if( select(maxfd, &rfds, NULL, &efds, NULL) < 0 )
-			switch( errno ) {
+		if (select(maxfd, &rfds, NULL, &efds, NULL) < 0)
+			switch (errno) {
 			case EBADF:
 			case EINVAL:
 				perror("error in select()");
@@ -50,15 +51,15 @@ int sosc_event_loop(const sosc_state_t *state) {
 			}
 
 		/* is the monome still connected? */
-		if( FD_ISSET(mfd, &efds) )
+		if (FD_ISSET(mfd, &efds))
 			return 1;
 
 		/* is there data available for reading from the monome? */
-		if( FD_ISSET(mfd, &rfds) )
+		if (FD_ISSET(mfd, &rfds))
 			monome_event_handle_next(state->monome);
 
 		/* how about from OSC? */
-		if( FD_ISSET(lofd, &rfds) )
+		if (FD_ISSET(lofd, &rfds))
 			lo_server_recv_noblock(state->server, 0);
-	} while( 1 );
+	}
 }

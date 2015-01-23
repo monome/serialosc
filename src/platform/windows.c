@@ -30,37 +30,43 @@
 
 #include "platform.h"
 
-static int mk_monome_dir(char *cdir) {
+static int
+mk_monome_dir(char *cdir)
+{
 	int ret = 0;
 	char *last_slash = strrchr(cdir, '\\');
 	*last_slash = '\0';
 
-	if( _mkdir(cdir) && errno != EEXIST )
+	if (_mkdir(cdir) && errno != EEXIST)
 		ret = 1;
 
 	*last_slash = '\\';
 	return ret;
 }
 
-char *sosc_get_config_directory() {
+char *
+sosc_get_config_directory(void)
+{
 	char *appdata;
 
-	if( !(appdata = getenv("LOCALAPPDATA")) )
+	if (!(appdata = getenv("LOCALAPPDATA")))
 		appdata = getenv("APPDATA");
 
 	return s_asprintf("%s\\Monome\\serialosc", appdata);
 }
 
-int sosc_config_create_directory() {
+int
+sosc_config_create_directory(void)
+{
 	char *cdir;
 	struct _stat buf[1];
 
 	cdir = sosc_get_config_directory();
-	if( _stat(cdir, buf) ) {
-		if( mk_monome_dir(cdir) )
+	if (_stat(cdir, buf)) {
+		if (mk_monome_dir(cdir))
 			goto err_mkdir;
 
-		if( _mkdir(cdir) )
+		if (_mkdir(cdir))
 			goto err_mkdir;
 	}
 
@@ -72,7 +78,9 @@ err_mkdir:
 	return 1;
 }
 
-char *s_asprintf(const char *fmt, ...) {
+char *
+s_asprintf(const char *fmt, ...)
+{
 	va_list args;
 	char *buf;
 	int len;
@@ -80,7 +88,7 @@ char *s_asprintf(const char *fmt, ...) {
 	va_start(args, fmt);
 
 	len = _vscprintf(fmt, args) + 1;
-	if( !(buf = s_calloc(sizeof(char), len)) )
+	if (!(buf = s_calloc(sizeof(char), len)))
 		return NULL;
 
 	vsprintf(buf, fmt, args);
@@ -89,18 +97,26 @@ char *s_asprintf(const char *fmt, ...) {
 	return buf;
 }
 
-void *s_malloc(size_t size) {
+void *
+s_malloc(size_t size)
+{
 	return malloc(size);
 }
 
-void *s_calloc(size_t nmemb, size_t size) {
+void *
+s_calloc(size_t nmemb, size_t size)
+{
 	return calloc(nmemb, size);
 }
 
-void *s_strdup(const char *s) {
+void *
+s_strdup(const char *s)
+{
 	return _strdup(s);
 }
 
-void s_free(void *ptr) {
+void
+s_free(void *ptr)
+{
 	free(ptr);
 }

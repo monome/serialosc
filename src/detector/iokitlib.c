@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,8 @@ typedef struct {
 } notify_state_t;
 
 
-static void send_connect(const char *devnode)
+static void
+send_connect(const char *devnode)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_CONNECTION,
@@ -48,18 +49,20 @@ static void send_connect(const char *devnode)
 	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
-static int wait_on_parent_usbdevice(io_service_t device) {
+static int
+wait_on_parent_usbdevice(io_service_t device)
+{
 	io_registry_entry_t parent;
 
 	/* walk up the device tree looking for the IOUSBDevice */
-	for( ;; ) {
+	for (;;) {
 		/* return an error if we've walked off the end of the tree,
 		   i.e. if this tty isn't a USB device. */
-		if( IORegistryEntryGetParentEntry(device, kIOServicePlane, &parent) )
+		if (IORegistryEntryGetParentEntry(device, kIOServicePlane, &parent))
 			return 1;
 		device = parent;
 
-		if( IOObjectConformsTo(device, kIOUSBDeviceClassName) )
+		if (IOObjectConformsTo(device, kIOUSBDeviceClassName))
 			break;
 	}
 
@@ -68,27 +71,29 @@ static int wait_on_parent_usbdevice(io_service_t device) {
 	return 0;
 }
 
-static void iterate_devices(void *context, io_iterator_t iter) {
+static void
+iterate_devices(void *context, io_iterator_t iter)
+{
 	io_service_t device;
 	io_struct_inband_t devnode;
 	unsigned int len = 256;
 
-	while( (device = IOIteratorNext(iter)) ) {
+	while ((device = IOIteratorNext(iter))) {
 		IORegistryEntryGetProperty(device, kIODialinDeviceKey, devnode, &len);
 
-		if( !wait_on_parent_usbdevice(device) )
+		if (!wait_on_parent_usbdevice(device))
 			send_connect(devnode);
 
 		IOObjectRelease(device);
 	}
-
-	return;
 }
 
-static int init_iokitlib(notify_state_t *state) {
+static int
+init_iokitlib(notify_state_t *state)
+{
 	CFMutableDictionaryRef matching;
 
-	if( !(state->notify = IONotificationPortCreate((mach_port_t) 0)) ) {
+	if (!(state->notify = IONotificationPortCreate((mach_port_t) 0))) {
 		fprintf(stderr, "couldn't allocate notification port, aieee!\n");
 		return 1;
 	}
@@ -114,15 +119,19 @@ static int init_iokitlib(notify_state_t *state) {
 	return 0;
 }
 
-static void fini_iokitlib(notify_state_t *state) {
+static void
+fini_iokitlib(notify_state_t *state)
+{
 	IOObjectRelease(state->iter);
 	IONotificationPortDestroy(state->notify);
 }
 
-int sosc_detector_run(const char *exec_path) {
+int
+sosc_detector_run(const char *exec_path)
+{
 	notify_state_t state;
 
-	if( init_iokitlib(&state) )
+	if (init_iokitlib(&state))
 		return 1;
 
 	iterate_devices(&state, state.iter);

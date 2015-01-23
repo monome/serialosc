@@ -19,10 +19,12 @@
 
 #include "platform.h"
 
-char *sosc_get_config_directory() {
+char *
+sosc_get_config_directory(void)
+{
 	char *dir;
 
-	if( getenv("XDG_CONFIG_HOME") )
+	if (getenv("XDG_CONFIG_HOME"))
 		dir = s_asprintf("%s/serialosc", getenv("XDG_CONFIG_HOME"));
 	else
 		dir = s_asprintf("%s/.config/serialosc", getenv("HOME"));
@@ -30,24 +32,26 @@ char *sosc_get_config_directory() {
 	return dir;
 }
 
-int sosc_config_create_directory() {
+int
+sosc_config_create_directory(void)
+{
 	char *cdir, *xdgdir;
 	struct stat buf[1];
 
 	cdir = sosc_get_config_directory();
 
-	if( stat(cdir, buf) ) {
-		if( !getenv("XDG_CONFIG_HOME") ) {
+	if (stat(cdir, buf)) {
+		if (!getenv("XDG_CONFIG_HOME")) {
 			xdgdir = s_asprintf("%s/.config", getenv("HOME"));
 
 			/* well, I guess somebody's got to do it */
-			if( stat(xdgdir, buf) && mkdir(xdgdir, S_IRWXU) )
+			if (stat(xdgdir, buf) && mkdir(xdgdir, S_IRWXU))
 				goto err_xdg;
 
 			s_free(xdgdir);
 		}
 
-		if( mkdir(cdir, S_IRWXU) )
+		if (mkdir(cdir, S_IRWXU))
 			goto err_mkdir;
 	}
 

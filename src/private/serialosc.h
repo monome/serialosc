@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -72,7 +72,7 @@ int sosc_config_write(const char *serial, sosc_state_t *state);
 
 void sosc_port_itos(char *dest, long int port);
 
-void sosc_zeroconf_init();
+void sosc_zeroconf_init(void);
 void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name);
 void sosc_zeroconf_unregister(sosc_state_t *state);
 

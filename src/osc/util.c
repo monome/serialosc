@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,10 +24,12 @@
 
 #include "osc.h"
 
-char *osc_path(const char *path, const char *prefix) {
+char *
+osc_path(const char *path, const char *prefix)
+{
 	char *buf;
 
-	if( !(buf = s_asprintf("%s/%s", prefix, path)) ) {
+	if (!(buf = s_asprintf("%s/%s", prefix, path))) {
 		fprintf(stderr, "aieee, could not allocate memory in "
 				"osc_path(), bailing out!\n");
 

@@ -1,10 +1,10 @@
 /**
  * Copyright (c) 2011 William Light <wrl@illest.net>
- * 
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -51,7 +51,8 @@ static struct detector_state state = {
 	}
 };
 
-void send_connect(char *port)
+static void
+send_connect(char *port)
 {
 	uint8_t buf[64];
 	DWORD written;
@@ -72,7 +73,8 @@ void send_connect(char *port)
 	WriteFile(state.pipe_to_supervisor, buf, bufsiz, &written, NULL);
 }
 
-int scan_connected_devices()
+static int
+scan_connected_devices(void)
 {
 	HKEY key, subkey;
 	char subkey_name[MAX_PATH], *subkey_path;
@@ -80,9 +82,8 @@ int scan_connected_devices()
 	DWORD klen, plen, ptype;
 	int i = 0;
 
-	switch( RegOpenKeyEx(
-			HKEY_LOCAL_MACHINE, FTDI_REG_PATH,
-			0, KEY_READ, &key) ) {
+	switch (RegOpenKeyEx(HKEY_LOCAL_MACHINE, FTDI_REG_PATH,
+			0, KEY_READ, &key)) {
 	case ERROR_SUCCESS:
 		/* ERROR: request was (unexpectedly) successful */
 		break;
@@ -94,10 +95,11 @@ int scan_connected_devices()
 		return 1;
 	}
 
-	do {
+	for (;;) {
 		klen = sizeof(subkey_name) / sizeof(char);
-		switch( RegEnumKeyEx(key, i++, subkey_name, &klen,
-							 NULL, NULL, NULL, NULL) ) {
+
+		switch (RegEnumKeyEx(key, i++, subkey_name, &klen,
+					NULL, NULL, NULL, NULL)) {
 		case ERROR_MORE_DATA:
 		case ERROR_SUCCESS:
 			break;
@@ -107,11 +109,10 @@ int scan_connected_devices()
 		}
 
 		subkey_path = s_asprintf("%s\\%s\\0000\\Device Parameters",
-								 FTDI_REG_PATH, subkey_name);
+				FTDI_REG_PATH, subkey_name);
 
-		switch( RegOpenKeyEx(
-				HKEY_LOCAL_MACHINE, subkey_path,
-				0, KEY_READ, &subkey) ) {
+		switch (RegOpenKeyEx(HKEY_LOCAL_MACHINE, subkey_path,
+					0, KEY_READ, &subkey)) {
 		case ERROR_SUCCESS:
 			break;
 
@@ -124,8 +125,8 @@ int scan_connected_devices()
 
 		plen = sizeof(port_name) / sizeof(char);
 		ptype = REG_SZ;
-		switch( RegQueryValueEx(subkey, "PortName", 0, &ptype,
-								port_name, &plen) ) {
+		switch (RegQueryValueEx(subkey, "PortName", 0, &ptype,
+					port_name, &plen)) {
 		case ERROR_SUCCESS:
 			port_name[plen] = '\0';
 			break;
@@ -138,14 +139,15 @@ int scan_connected_devices()
 
 next:
 		RegCloseKey(subkey);
-	} while( 1 );
+	}
 
 done:
 	RegCloseKey(key);
 	return 0;
 }
 
-char *ftdishit_to_port(char *bullshit)
+static char *
+ftdishit_to_port(char *bullshit)
 {
 	char *subkey_path, *port, port_name[64];
 	DWORD plen, ptype;
@@ -192,12 +194,13 @@ char *ftdishit_to_port(char *bullshit)
 	return s_strdup(port_name);
 }
 
-DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
+DWORD WINAPI
+control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
 {
 	DEV_BROADCAST_DEVICEINTERFACE *dev;
 	char devname[256], *port;
 
-	switch( ctrl ) {
+	switch (ctrl) {
 	case SERVICE_CONTROL_SHUTDOWN:
 	case SERVICE_CONTROL_STOP:
 		state.svc_status.dwWin32ExitCode = 0;
@@ -210,7 +213,7 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
 		return NO_ERROR;
 
 	case SERVICE_CONTROL_DEVICEEVENT:
-		switch( type ) {
+		switch (type) {
 		case DBT_DEVICEARRIVAL:
 			dev = data;
 			wcstombs(devname, (wchar_t *) dev->dbcc_name, sizeof(devname));
@@ -233,7 +236,8 @@ DWORD WINAPI control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
 	return ERROR_CALL_NOT_IMPLEMENTED;
 }
 
-int setup_device_notification()
+static int
+setup_device_notification(void)
 {
 	DEV_BROADCAST_DEVICEINTERFACE filter;
 	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
@@ -245,13 +249,14 @@ int setup_device_notification()
 	filter.dbcc_classguid = vcp_guid;
 	filter.dbcc_name[0] = '\0';
 
-	if( !RegisterDeviceNotification((HANDLE) state.hstatus, &filter,
+	if (!RegisterDeviceNotification((HANDLE) state.hstatus, &filter,
 									DEVICE_NOTIFY_SERVICE_HANDLE))
 		return 1;
 	return 0;
 }
 
-static int open_pipe_to_supervisor()
+static int
+open_pipe_to_supervisor(void)
 {
 	HANDLE p = NULL;
 	DWORD pipe_state;
@@ -268,7 +273,7 @@ static int open_pipe_to_supervisor()
 
 		if (p != INVALID_HANDLE_VALUE)
 			break;
-			
+
 		switch (GetLastError()) {
 		case ERROR_FILE_NOT_FOUND:
 			Sleep(100);
@@ -287,18 +292,20 @@ static int open_pipe_to_supervisor()
 	return 0;
 }
 
-static DWORD WINAPI supervisor_thread(LPVOID param)
+static DWORD WINAPI
+supervisor_thread(LPVOID param)
 {
 	sosc_supervisor_run(NULL);
 	return 0;
 }
 
-void WINAPI service_main(DWORD argc, LPTSTR *argv)
+static void WINAPI
+service_main(DWORD argc, LPTSTR *argv)
 {
 	state.hstatus = RegisterServiceCtrlHandlerEx(
 		SOSC_WIN_SERVICE_NAME, control_handler, NULL);
 
-	if( !state.hstatus )
+	if (!state.hstatus)
 		return;
 
 	state.svc_status.dwCurrentState = SERVICE_RUNNING;
@@ -324,7 +331,8 @@ err_supervisor_pipe:
 	return;
 }
 
-void debug_main()
+static void
+debug_main(void)
 {
 	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
 	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
@@ -336,7 +344,8 @@ void debug_main()
 		Sleep(10000);
 }
 
-int sosc_detector_run(const char *exec_path)
+int
+sosc_detector_run(const char *exec_path)
 {
 	SERVICE_TABLE_ENTRY services[] = {
 		{SOSC_WIN_SERVICE_NAME, service_main},

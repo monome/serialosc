@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -41,7 +41,9 @@ typedef struct sosc_device_info {
 	char *friendly;
 } sosc_device_info_t;
 
-static void disable_subproc_waiting() {
+static void
+disable_subproc_waiting(void)
+{
 	struct sigaction s;
 
 	memset(&s, 0, sizeof(struct sigaction));
@@ -54,7 +56,8 @@ static void disable_subproc_waiting() {
 	}
 }
 
-static int spawn_server(const char *exec_path, const char *devnode)
+static int
+spawn_server(const char *exec_path, const char *devnode)
 {
 	int pipefds[2];
 
@@ -106,7 +109,9 @@ sosc_notifications_t notifications = {0};
 
 static lo_server *srv;
 
-static int portstr(char *dest, int src) {
+static int
+portstr(char *dest, int src)
+{
 	return snprintf(dest, 6, "%d", src);
 }
 
@@ -152,7 +157,8 @@ OSC_HANDLER_FUNC(add_notification_endpoint)
 	return 0;
 }
 
-static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
+static lo_server *
+setup_osc_server(sosc_dev_datastore_t *devs)
 {
 	lo_server *srv;
 
@@ -167,7 +173,8 @@ static lo_server *setup_osc_server(sosc_dev_datastore_t *devs)
 	return srv;
 }
 
-static int notify(sosc_ipc_type_t type, sosc_device_info_t *dev)
+static int
+notify(sosc_ipc_type_t type, sosc_device_info_t *dev)
 {
 	lo_address dst;
 	char *path;
@@ -203,7 +210,8 @@ static int notify(sosc_ipc_type_t type, sosc_device_info_t *dev)
 	return 0;
 }
 
-static void read_detector_msgs(const char *progname, int fd)
+static void
+read_detector_msgs(const char *progname, int fd)
 {
 	sosc_dev_datastore_t devs = {
 		0, {[0 ... MAX_DEVICES - 1] = NULL}
@@ -229,7 +237,7 @@ static void read_detector_msgs(const char *progname, int fd)
 	fds[MONITOR_FD].fd     = fd;
 	fds[MONITOR_FD].events = POLLIN;
 
-	do {
+	for (;;) {
 		notified = 0;
 
 		if (poll(fds, FD_COUNT, -1) < 0) {
@@ -339,10 +347,11 @@ disconnect_unknown:
 
 		if (notified)
 			notifications.count = 0;
-	} while (1);
+	}
 }
 
-int sosc_supervisor_run(char *progname)
+int
+sosc_supervisor_run(char *progname)
 {
 	int pipefds[2];
 
@@ -377,4 +386,3 @@ int sosc_supervisor_run(char *progname)
 
 	return 0;
 }
-

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,8 +20,9 @@
 
 #include "serialosc.h"
 
-
-int sosc_event_loop(const sosc_state_t *state) {
+int
+sosc_event_loop(const sosc_state_t *state)
+{
 	struct pollfd fds[2];
 
 	fds[0].fd = monome_get_fd(state->monome);
@@ -30,10 +31,10 @@ int sosc_event_loop(const sosc_state_t *state) {
 	fds[0].events = POLLIN;
 	fds[1].events = POLLIN;
 
-	do {
+	for (;;) {
 		/* block until either the monome or liblo have data */
-		if( poll(fds, 2, -1) < 0 )
-			switch( errno ) {
+		if (poll(fds, 2, -1) < 0)
+			switch (errno) {
 			case EINVAL:
 				perror("error in poll()");
 				return 1;
@@ -44,15 +45,15 @@ int sosc_event_loop(const sosc_state_t *state) {
 			}
 
 		/* is the monome still connected? */
-		if( fds[0].revents & (POLLHUP | POLLERR) )
+		if (fds[0].revents & (POLLHUP | POLLERR))
 			return 1;
 
 		/* is there data available for reading from the monome? */
-		if( fds[0].revents & POLLIN )
+		if (fds[0].revents & POLLIN)
 			monome_event_handle_next(state->monome);
 
 		/* how about from OSC? */
-		if( fds[1].revents & POLLIN )
+		if (fds[1].revents & POLLIN)
 			lo_server_recv_noblock(state->server, 0);
-	} while( 1 );
+	}
 }

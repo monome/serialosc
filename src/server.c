@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -41,19 +41,29 @@
 #define DEFAULT_ROTATION        MONOME_ROTATE_0
 
 
-static void lo_error(int num, const char *error_msg, const char *path) {
+static void
+lo_error(int num, const char *error_msg, const char *path)
+{
 	fprintf(stderr, "serialosc: lo server error %d in %s: %s\n",
 	        num, path, error_msg);
 	fflush(stderr);
 }
 
-static const char *null_if_zero(const char *s) {
-	if( !*s )
+static const char *
+null_if_zero(const char *s)
+{
+	if (!*s)
 		return NULL;
 	return s;
 }
 
-static void handle_press(const monome_event_t *e, void *data) {
+/*************************************************************************
+ * device -> OSC messages
+ *************************************************************************/
+
+static void
+handle_press(const monome_event_t *e, void *data)
+{
 	sosc_state_t *state = data;
 	char *cmd;
 
@@ -63,7 +73,9 @@ static void handle_press(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
-static void handle_enc_delta(const monome_event_t *e, void *data) {
+static void
+handle_enc_delta(const monome_event_t *e, void *data)
+{
 	sosc_state_t *state = data;
 	char *cmd;
 
@@ -73,7 +85,9 @@ static void handle_enc_delta(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
-static void handle_enc_key(const monome_event_t *e, void *data) {
+static void
+handle_enc_key(const monome_event_t *e, void *data)
+{
 	sosc_state_t *state = data;
 	char *cmd;
 
@@ -83,7 +97,9 @@ static void handle_enc_key(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
-static void handle_tilt(const monome_event_t *e, void *data) {
+static void
+handle_tilt(const monome_event_t *e, void *data)
+{
 	sosc_state_t *state = data;
 	char *cmd;
 
@@ -93,7 +109,9 @@ static void handle_tilt(const monome_event_t *e, void *data) {
 	s_free(cmd);
 }
 
-static void send_connection_status(sosc_state_t *state, int status) {
+static void
+send_connection_status(sosc_state_t *state, int status)
+{
 	char *cmd, *cmds[] = {
 		"/sys/disconnect",
 		"/sys/connect"
@@ -105,7 +123,8 @@ static void send_connection_status(sosc_state_t *state, int status) {
 
 #ifndef WIN32
 /* not windows */
-static void send_simple_ipc(int fd, sosc_ipc_type_t type)
+static void
+send_simple_ipc(int fd, sosc_ipc_type_t type)
 {
 	sosc_ipc_msg_t msg = {
 		.type = type
@@ -114,7 +133,8 @@ static void send_simple_ipc(int fd, sosc_ipc_type_t type)
 	sosc_ipc_msg_write(fd, &msg);
 }
 
-static void send_device_info(int fd, monome_t *monome)
+static void
+send_device_info(int fd, monome_t *monome)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_INFO,
@@ -126,7 +146,8 @@ static void send_device_info(int fd, monome_t *monome)
 	sosc_ipc_msg_write(fd, &msg);
 }
 
-static void send_osc_port_change(int fd, uint16_t port)
+static void
+send_osc_port_change(int fd, uint16_t port)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_OSC_PORT_CHANGE,
@@ -138,7 +159,8 @@ static void send_osc_port_change(int fd, uint16_t port)
 }
 #else
 /* windows. */
-static void send_ipc_msg(sosc_ipc_msg_t *msg)
+static void
+send_ipc_msg(sosc_ipc_msg_t *msg)
 {
 	HANDLE p = (HANDLE) _get_osfhandle(STDOUT_FILENO);
 	uint8_t buf[64];
@@ -155,7 +177,8 @@ static void send_ipc_msg(sosc_ipc_msg_t *msg)
 	WriteFile(p, buf, bufsiz, &written, NULL);
 }
 
-static void send_simple_ipc(int fd, sosc_ipc_type_t type)
+static void
+send_simple_ipc(int fd, sosc_ipc_type_t type)
 {
 	sosc_ipc_msg_t msg = {
 		.type = type
@@ -164,7 +187,8 @@ static void send_simple_ipc(int fd, sosc_ipc_type_t type)
 	send_ipc_msg(&msg);
 }
 
-static void send_device_info(int fd, monome_t *monome)
+static void
+send_device_info(int fd, monome_t *monome)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_INFO,
@@ -176,7 +200,8 @@ static void send_device_info(int fd, monome_t *monome)
 	send_ipc_msg(&msg);
 }
 
-static void send_osc_port_change(int fd, uint16_t port)
+static void
+send_osc_port_change(int fd, uint16_t port)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_OSC_PORT_CHANGE,
@@ -188,7 +213,8 @@ static void send_osc_port_change(int fd, uint16_t port)
 }
 #endif
 
-void sosc_server_run(monome_t *monome)
+void
+sosc_server_run(monome_t *monome)
 {
 	char *svc_name;
 	sosc_state_t state = {
@@ -196,18 +222,18 @@ void sosc_server_run(monome_t *monome)
 		.ipc_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
 	};
 
-	if( sosc_config_read(monome_get_serial(state.monome), &state.config) ) {
+	if (sosc_config_read(monome_get_serial(state.monome), &state.config)) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't read config, using defaults\n",
 			monome_get_serial(state.monome));
 	}
 
-	if( !(state.server = lo_server_new(null_if_zero(state.config.server.port),
-									   lo_error)) )
+	if (!(state.server = lo_server_new(null_if_zero(state.config.server.port),
+					lo_error)))
 		goto err_server_new;
 
-	if( !(state.outgoing = lo_address_new(
-				state.config.app.host, null_if_zero(state.config.app.port))) ) {
+	if (!(state.outgoing = lo_address_new(
+				state.config.app.host, null_if_zero(state.config.app.port)))) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't allocate lo_address, aieee!\n",
 			monome_get_serial(state.monome));
@@ -218,7 +244,7 @@ void sosc_server_run(monome_t *monome)
 		"%s (%s)", monome_get_friendly_name(state.monome),
 		monome_get_serial(state.monome));
 
-	if( !svc_name ) {
+	if (!svc_name) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't allocate memory, aieee!\n",
 			monome_get_serial(state.monome));
@@ -266,7 +292,7 @@ void sosc_server_run(monome_t *monome)
 	} else
 		send_simple_ipc(state.ipc_fd, SOSC_DEVICE_DISCONNECTION);
 
-	if( sosc_config_write(monome_get_serial(state.monome), &state) ) {
+	if (sosc_config_write(monome_get_serial(state.monome), &state)) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't write config :(\n",
 			monome_get_serial(state.monome));

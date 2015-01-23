@@ -19,7 +19,8 @@
 #include "serialosc.h"
 #include "zeroconf.h"
 
-void sosc_zeroconf_init()
+void
+sosc_zeroconf_init(void)
 {
 	sosc_dnssd_registration_func = DNSServiceRegister;
 	sosc_dnssd_deallocation_func = DNSServiceRefDeallocate;

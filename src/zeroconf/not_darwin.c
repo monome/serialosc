@@ -30,7 +30,8 @@ union dealloc_func {
 	void *vptr;
 };
 
-void sosc_zeroconf_init()
+void
+sosc_zeroconf_init(void)
 {
 	union dealloc_func dfunc;
 	union reg_func rfunc;

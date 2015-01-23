@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  * 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,8 @@ typedef struct {
 } detector_state_t;
 
 
-static void send_connect(const char *devnode)
+static void
+send_connect(const char *devnode)
 {
 	sosc_ipc_msg_t msg = {
 		.type = SOSC_DEVICE_CONNECTION,
@@ -47,16 +48,18 @@ static void send_connect(const char *devnode)
 	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
-static monome_t *monitor_attach(detector_state_t *state) {
+static monome_t *
+monitor_attach(detector_state_t *state)
+{
 	struct udev_device *ud;
 	struct pollfd fds[1];
 
 	fds[0].fd = udev_monitor_get_fd(state->um);
 	fds[0].events = POLLIN;
 
-	do {
-		if( poll(fds, 1, -1) < 0 )
-			switch( errno ) {
+	for (;;) {
+		if (poll(fds, 1, -1) < 0)
+			switch (errno) {
 			case EINVAL:
 				perror("error in poll()");
 				exit(1);
@@ -70,21 +73,23 @@ static monome_t *monitor_attach(detector_state_t *state) {
 
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
-		if( *(udev_device_get_action(ud)) == 'a' )
+		if (*(udev_device_get_action(ud)) == 'a')
 			send_connect(udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
-	} while( 1 );
+	}
 }
 
-int scan_connected_devices(detector_state_t *state) {
+static int
+scan_connected_devices(detector_state_t *state)
+{
 	struct udev_list_entry *cursor;
 	struct udev_enumerate *ue;
 	struct udev_device *ud;
 
 	const char *devnode = NULL;
 
-	if( !(ue = udev_enumerate_new(state->u)) )
+	if (!(ue = udev_enumerate_new(state->u)))
 		return 1;
 
 	udev_enumerate_add_match_subsystem(ue, "tty");
@@ -96,31 +101,33 @@ int scan_connected_devices(detector_state_t *state) {
 		ud = udev_device_new_from_syspath(
 			state->u, udev_list_entry_get_name(cursor));
 
-		if( (devnode = udev_device_get_devnode(ud)) )
+		if ((devnode = udev_device_get_devnode(ud)))
 			send_connect(devnode);
 
 		udev_device_unref(ud);
-	} while( (cursor = udev_list_entry_get_next(cursor)) );
+	} while ((cursor = udev_list_entry_get_next(cursor)));
 
 	udev_enumerate_unref(ue);
 	return 0;
 }
 
-int sosc_detector_run(const char *exec_path) {
+int
+sosc_detector_run(const char *exec_path)
+{
 	detector_state_t state;
 
 	state.u = udev_new();
 
-	if( scan_connected_devices(&state) )
+	if (scan_connected_devices(&state))
 		return 1;
 
-	if( !(state.um = udev_monitor_new_from_netlink(state.u, "udev")) )
+	if (!(state.um = udev_monitor_new_from_netlink(state.u, "udev")))
 		return 2;
 
 	udev_monitor_filter_add_match_subsystem_devtype(state.um, "tty", NULL);
 	udev_monitor_enable_receiving(state.um);
 
-	if( monitor_attach(&state) )
+	if (monitor_attach(&state))
 		return 3;
 
 	udev_monitor_unref(state.um);

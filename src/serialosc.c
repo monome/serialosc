@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 
 #include <stdlib.h>
 #include <string.h>
@@ -23,12 +23,14 @@
 #include <monome.h>
 #include "serialosc.h"
 
-static void print_version()
+static void
+print_version(void)
 {
 	printf("serialosc %s (%s)\n", VERSION, GIT_COMMIT);
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
 	monome_t *device;
 

@@ -21,31 +21,41 @@
 
 #include "serialosc.h"
 
-char *s_asprintf(const char *fmt, ...) {
+char *
+s_asprintf(const char *fmt, ...)
+{
 	va_list args;
 	char *buf;
 
 	va_start(args, fmt);
 
-	if( vasprintf(&buf, fmt, args) < 0 )
+	if (vasprintf(&buf, fmt, args) < 0)
 		buf = NULL;
 
 	va_end(args);
 	return buf;
 }
 
-void *s_malloc(size_t size) {
+void *
+s_malloc(size_t size)
+{
 	return malloc(size);
 }
 
-void *s_calloc(size_t nmemb, size_t size) {
+void *
+s_calloc(size_t nmemb, size_t size)
+{
 	return calloc(nmemb, size);
 }
 
-void *s_strdup(const char *s) {
+void *
+s_strdup(const char *s)
+{
 	return strdup(s);
 }
 
-void s_free(void *ptr) {
+void
+s_free(void *ptr)
+{
 	free(ptr);
 }

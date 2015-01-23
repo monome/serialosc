@@ -18,17 +18,20 @@
 
 #include "serialosc.h"
 
-void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)
+void
+sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)
 {
 	return;
 }
 
-void sosc_zeroconf_unregister(sosc_state_t *state)
+void
+sosc_zeroconf_unregister(sosc_state_t *state)
 {
 	return;
 }
 
-void sosc_zeroconf_init()
+void
+sosc_zeroconf_init(void)
 {
 	return;
 }

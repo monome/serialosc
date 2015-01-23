@@ -101,7 +101,8 @@ static struct supervisor_state state = {
  * overlapped i/o helpers
  *************************************************************************/
 
-static int overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
+static int
+overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
 {
 	DWORD err;
 
@@ -124,7 +125,8 @@ static int overlapped_connect_pipe(HANDLE p, OVERLAPPED *ov)
 	return 0;
 }
 
-static HANDLE open_pipe_to_supervisor()
+static HANDLE
+open_pipe_to_supervisor(void)
 {
 	SECURITY_ATTRIBUTES sattr;
 	HANDLE p = NULL;
@@ -134,7 +136,7 @@ static HANDLE open_pipe_to_supervisor()
 	sattr.bInheritHandle = TRUE;
 	sattr.lpSecurityDescriptor = NULL;
 
-	do {
+	for (;;) {
 		p = CreateFile(
 			SOSC_DEVICE_PIPE,
 			GENERIC_WRITE,
@@ -155,7 +157,7 @@ static HANDLE open_pipe_to_supervisor()
 		default:
 			return INVALID_HANDLE_VALUE;
 		}
-	} while (1);
+	}
 
 	pipe_state = PIPE_READMODE_MESSAGE;
 	SetNamedPipeHandleState(p, &pipe_state, NULL, NULL);
@@ -163,7 +165,8 @@ static HANDLE open_pipe_to_supervisor()
 	return p;
 }
 
-int spawn_server(const char *devnode)
+static int
+spawn_server(const char *devnode)
 {
 	STARTUPINFO sinfo = {sizeof(sinfo)};
 	PROCESS_INFORMATION pinfo;
@@ -241,7 +244,9 @@ struct notifications notifications = {
  * osc stuff
  *************************************************************************/
 
-static int portstr(char *dest, int src) {
+static int
+portstr(char *dest, int src)
+{
 	return snprintf(dest, 6, "%d", src);
 }
 
@@ -296,19 +301,22 @@ OSC_HANDLER_FUNC(add_notification_endpoint)
 	return 0;
 }
 
-static void reset_notifications()
+static void
+reset_notifications(void)
 {
 	if (notifications.notified)
 		notifications.notified = 
 			notifications.count = 0;
 }
 
-static void osc_error(int num, const char *msg, const char *where)
+static void
+osc_error(int num, const char *msg, const char *where)
 {
 	fprintf(stderr, "[!] osc server error %d, \"%s\" (%s)", num, msg, where);
 }
 
-static int init_osc_server()
+static int
+init_osc_server(void)
 {
 	if (!(state.srv = lo_server_new(SOSC_SUPERVISOR_OSC_PORT, osc_error))) {
 		fprintf(stderr, "supervisor: couldn't create lo_server\n");
@@ -337,7 +345,8 @@ err_server_new:
  * supervisor read loop
  *************************************************************************/
 
-static int notify(struct incoming_pipe *p, sosc_ipc_type_t type)
+static int
+notify(struct incoming_pipe *p, sosc_ipc_type_t type)
 {
 	struct notification_endpoint *e;
 	lo_address dst;
@@ -375,7 +384,9 @@ static int notify(struct incoming_pipe *p, sosc_ipc_type_t type)
 	notifications.notified++;
 	return 0;
 }
-static int handle_disconnect(struct incoming_pipe *p)
+
+static int
+handle_disconnect(struct incoming_pipe *p)
 {
 	DisconnectNamedPipe(p->pipe);
 
@@ -406,7 +417,8 @@ static int handle_disconnect(struct incoming_pipe *p)
 	return 0;
 }
 
-static int handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
+static int
+handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 {
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
@@ -439,7 +451,8 @@ static int handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 	return 0;
 }
 
-static int handle_read(struct incoming_pipe *p)
+static int
+handle_read(struct incoming_pipe *p)
 {
 	ssize_t bytes_left, bytes_handled;
 	uint8_t *buf;
@@ -465,7 +478,8 @@ static int handle_read(struct incoming_pipe *p)
 	return 0;
 }
 
-static int handle_pipe(struct incoming_pipe *p)
+static int
+handle_pipe(struct incoming_pipe *p)
 {
 	int res;
 
@@ -522,7 +536,8 @@ queue_read:
 	return 0;
 }
 
-static void read_loop()
+static void
+read_loop(void)
 {
 	SOCKET osc_sock = lo_server_get_socket_fd(state.srv);
 	WSANETWORKEVENTS dont_care;
@@ -575,7 +590,8 @@ static void read_loop()
  * pipe initialization
  *************************************************************************/
 
-static int init_device_events()
+static int
+init_device_events(void)
 {
 	struct incoming_pipe *p;
 	int i;
@@ -625,7 +641,8 @@ static int init_device_events()
 	return 0;
 }
 
-static int init_detector_pipe()
+static int
+init_detector_pipe(void)
 {
 	struct incoming_pipe *p = &state.detector;
 
@@ -668,7 +685,8 @@ static int init_detector_pipe()
 	return 0;
 }
 
-static int init_events()
+static int
+init_events(void)
 {
 	if (init_osc_server() ||
 		init_device_events() ||
@@ -682,42 +700,45 @@ static int init_events()
  * windows bullshit
  *************************************************************************/
 
-static int setup_reaper_job()
+static int
+setup_reaper_job(void)
 {
 	JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli;
 	memset(&jeli, '\0', sizeof(jeli));
 
-	if( !(state.reaper_job = CreateJobObject(NULL, NULL)) )
+	if (!(state.reaper_job = CreateJobObject(NULL, NULL)))
 		return -1;
 
 	jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-	if( !SetInformationJobObject(
+	if (!SetInformationJobObject(
 			state.reaper_job, JobObjectExtendedLimitInformation, &jeli,
-			sizeof(jeli)) )
+			sizeof(jeli)))
 		return -1;
 
 	return 0;
 }
 
-static char *get_service_binpath()
+static char *
+get_service_binpath(void)
 {
 	SC_HANDLE manager, service;
 	LPQUERY_SERVICE_CONFIG config;
 	DWORD config_size;
 	char *bin_path;
 
-	if( !(manager = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE)) )
+	if (!(manager = OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE)))
 		goto err_manager;
 
-	if( !(service = OpenService(manager, SOSC_WIN_SERVICE_NAME, SERVICE_QUERY_CONFIG)) )
+	if (!(service = OpenService(manager,
+					SOSC_WIN_SERVICE_NAME, SERVICE_QUERY_CONFIG)))
 		goto err_service;
 
 	QueryServiceConfig(service, NULL, 0, &config_size);
 
-	if( !(config = s_malloc(config_size)) )
+	if (!(config = s_malloc(config_size)))
 		goto err_malloc;
 
-	if( !QueryServiceConfig(service, config, config_size, &config_size) )
+	if (!QueryServiceConfig(service, config, config_size, &config_size))
 		goto err_query;
 
 	bin_path = s_strdup(config->lpBinaryPathName);
@@ -741,7 +762,8 @@ err_manager:
  * entry point from detector
  *************************************************************************/
 
-int sosc_supervisor_run(char *progname)
+int
+sosc_supervisor_run(char *progname)
 {
 	if (init_events())
 		goto err_ev_init;

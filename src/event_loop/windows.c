@@ -22,16 +22,20 @@
 
 #include "serialosc.h"
 
-static DWORD WINAPI lo_thread(LPVOID param) {
+static DWORD WINAPI
+lo_thread(LPVOID param)
+{
 	sosc_state_t *state = param;
 
-	while( 1 )
+	for (;;)
 		lo_server_recv(state->server);
 
 	return 0;
 }
 
-int sosc_event_loop(const sosc_state_t *state) {
+int
+sosc_event_loop(const sosc_state_t *state)
+{
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
 	HANDLE hres, lo_thd_res;
 	DWORD evt_mask;
@@ -39,17 +43,17 @@ int sosc_event_loop(const sosc_state_t *state) {
 	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
 	lo_thd_res = CreateThread(NULL, 0, lo_thread, (void *) state, 0, NULL);
 
-	if( !(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL)) ) {
+	if (!(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL))) {
 		fprintf(stderr, "serialosc: event_loop: can't allocate event (%ld)\n",
 		        GetLastError());
 		return 1;
 	}
 
-	do {
+	for (;;) {
 		SetCommMask(hres, EV_RXCHAR);
 
-		if( !WaitCommEvent(hres, &evt_mask, &ov) )
-			switch( GetLastError() ) {
+		if (!WaitCommEvent(hres, &evt_mask, &ov))
+			switch (GetLastError()) {
 			case ERROR_IO_PENDING:
 				break;
 
@@ -62,9 +66,9 @@ int sosc_event_loop(const sosc_state_t *state) {
 				return 1;
 			}
 
-		switch( WaitForSingleObject(ov.hEvent, INFINITE) ) {
+		switch (WaitForSingleObject(ov.hEvent, INFINITE)) {
 		case WAIT_OBJECT_0:
-			while( monome_event_handle_next(state->monome) );
+			while (monome_event_handle_next(state->monome));
 			break;
 
 		case WAIT_TIMEOUT:
@@ -76,7 +80,7 @@ int sosc_event_loop(const sosc_state_t *state) {
 			        GetLastError());
 			return 1;
 		}
-	} while ( 1 );
+	}
 
 	((void) lo_thd_res); /* shut GCC up about this being an unused variable */
 	return 0;

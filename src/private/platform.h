@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-char *sosc_get_config_directory();
+char *sosc_get_config_directory(void);
 
 char *s_asprintf(const char *fmt, ...);
 void *s_malloc(size_t size);

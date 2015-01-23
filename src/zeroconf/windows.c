@@ -22,7 +22,8 @@
 #include "serialosc.h"
 #include "zeroconf.h"
 
-void sosc_zeroconf_init()
+void
+sosc_zeroconf_init(void)
 {
 	FARPROC rfunc, dfunc;
 	HMODULE ldnssd;

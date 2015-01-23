@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2011 William Light <wrl@illest.net>
+ * Copyright (c) 2010-2015 William Light <wrl@illest.net>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,7 +29,8 @@
  * i/o from file descriptors
  *************************************************************************/
 
-static int read_strdata(int fd, size_t n, ...)
+static int
+read_strdata(int fd, size_t n, ...)
 {
 	const char **cur;
 	uint16_t magic;
@@ -71,7 +72,8 @@ static int read_strdata(int fd, size_t n, ...)
 	return 0;
 }
 
-static int write_strdata(int fd, size_t n, ...)
+static int
+write_strdata(int fd, size_t n, ...)
 {
 	uint16_t magic = IPC_MAGIC;
 	const char *cur;
@@ -103,7 +105,8 @@ static int write_strdata(int fd, size_t n, ...)
 	return 0;
 }
 
-int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
+int
+sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 {
 	ssize_t written;
 
@@ -131,7 +134,8 @@ int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 	return written;
 }
 
-int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
+int
+sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
 {
 	ssize_t nbytes;
 
@@ -165,7 +169,8 @@ int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf)
  * serializing to and from buffers
  *************************************************************************/
 
-static ssize_t strdata_to_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
+static ssize_t
+strdata_to_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 {
 	uint16_t magic = IPC_MAGIC;
 	const char *cur;
@@ -212,7 +217,8 @@ static ssize_t strdata_to_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 	return nbytes - avail;
 }
 
-ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
+ssize_t
+sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
 {
 	ssize_t avail, strbytes;
 
@@ -259,7 +265,8 @@ ssize_t sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
 	return nbytes - avail;
 }
 
-static ssize_t strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
+static ssize_t
+strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 {
 	const char **cur;
 	uint16_t magic;
@@ -318,7 +325,8 @@ static ssize_t strdata_from_buf(uint8_t *buf, size_t nbytes, size_t n, ...)
 	return nbytes - avail;
 }
 
-ssize_t sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)
+ssize_t
+sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)
 {
 	ssize_t avail, strbytes;
 	*msg = (sosc_ipc_msg_t *) buf;

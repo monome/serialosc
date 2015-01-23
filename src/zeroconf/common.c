@@ -23,17 +23,19 @@
 dnssd_registration_func_t sosc_dnssd_registration_func = NULL;
 dnssd_deallocation_func_t sosc_dnssd_deallocation_func = NULL;
 
-static void DNSSD_API mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
-                   DNSServiceErrorType errorCode, const char *name,
-                   const char *regtype, const char *domain, void *context) {
-
+static void DNSSD_API
+mdns_callback(DNSServiceRef sdRef, DNSServiceFlags flags,
+		DNSServiceErrorType errorCode, const char *name,
+		const char *regtype, const char *domain, void *context)
+{
 	/* on OSX, the bonjour library insists on having a callback passed to
 	   DNSServiceRegister. */
 
 	return;
 }
 
-void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)
+void
+sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)
 {
 	if (!sosc_dnssd_registration_func)
 		return;
@@ -53,7 +55,8 @@ void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)
 		/* context        */  NULL);
 }
 
-void sosc_zeroconf_unregister(sosc_state_t *state)
+void
+sosc_zeroconf_unregister(sosc_state_t *state)
 {
 	if (!sosc_dnssd_deallocation_func)
 		return;
