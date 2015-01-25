@@ -1,6 +1,7 @@
 # waf stuff
 .lock-waf*
 .waf*
+__pycache__
 
 # build stuff
 build/

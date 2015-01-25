@@ -1,0 +1,3 @@
+[submodule "third-party/libuv"]
+	path = third-party/libuv
+	url = file:///home/will/dl/libuv

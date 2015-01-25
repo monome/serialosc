@@ -1,3 +1,5 @@
+autocmd BufEnter wscript set sw=4 ts=4 sta noet fo=croql
+
 let g:syntastic_mode_map = {
 			\ "mode": "active",
 			\ "active_filetypes": [],

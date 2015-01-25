@@ -114,6 +114,12 @@ def check_dnssd(conf):
 		mandatory=True,
 		header_name="dns_sd.h")
 
+def load_tools(ctx):
+	tooldir = ctx.path.find_dir('waftools').abspath()
+	load_tool = lambda t: ctx.load(t, tooldir=tooldir)
+
+	load_tool('gyp_wrapper')
+
 #
 # waf stuff
 #
@@ -136,6 +142,7 @@ def configure(conf):
 	separator()
 	conf.load("compiler_c")
 	conf.load("gnu_dirs")
+	load_tools(conf)
 
 	if conf.env.DEST_OS == "win32":
 		conf.load("winres")
@@ -192,6 +199,7 @@ def configure(conf):
 
 	conf.env.VERSION = VERSION
 	conf.define("VERSION", VERSION)
+	conf.define("_GNU_SOURCE", 1)
 	conf.define("GIT_COMMIT",
 		subprocess.check_output(["git", "rev-parse", "--verify", "--short", "HEAD"])
 			.decode().strip())
@@ -200,6 +208,7 @@ def configure(conf):
 
 def build(bld):
 	bld.get_config_header("config-autogen.h")
+	bld.recurse("third-party")
 	bld.recurse("src")
 
 def dist(dst):

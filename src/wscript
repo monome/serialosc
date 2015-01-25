@@ -114,7 +114,7 @@ def build(bld):
 			source=objs,
 			target="serialoscd",
 
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME",
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME LIBUV",
 			framework=["IOKit", "CoreFoundation"])
 
 	else:
@@ -122,4 +122,4 @@ def build(bld):
 			source=objs,
 			target="serialoscd",
 
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD_INC DL")
+			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD_INC DL LIBUV")

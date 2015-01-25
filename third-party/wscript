@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+
+top = ".."
+
+def build_uv(ctx):
+	from_gyp = ctx.target_from_gyp('libuv/uv.gyp', 'libuv')
+
+	extra_cflags = ['-Wno-cast-align']
+
+	if ctx.env.DEST_OS == 'win32':
+		import re
+
+		from_gyp['defines'].remove('_GNU_SOURCE')
+
+		extra_cflags += [
+			'-std=gnu89',
+
+			'-Wno-sign-compare',
+			'-Wno-unused-function',
+			'-Wno-pointer-sign',
+			'-Wno-maybe-uninitialized',
+			'-Wno-unused-but-set-variable',
+			'-Wno-unused-variable',
+
+			'-fno-strict-aliasing']
+
+		from_gyp['libraries'] = [re.sub('\.lib$', '', x)
+				for x in from_gyp['libraries']]
+	elif ctx.env.DEST_OS == 'darwin':
+		# some bullshit about converting between void pointer and function pointer
+		from_gyp['cflags'].remove('-pedantic')
+
+	ctx.env.append_unique('LINKFLAGS_UV_FLAGS', from_gyp['ldflags'])
+	ctx.env.append_unique('LIB_UV_FLAGS', from_gyp['libraries'])
+
+	ctx.stlib(
+		source=from_gyp['sources'],
+		includes=['libuv/include', 'libuv/src'],
+		export_includes='libuv/include',
+		defines=from_gyp['defines'],
+
+		cflags=from_gyp['cflags'] + ctx.env['CFLAGS_cshlib'] + extra_cflags,
+		linkflags=from_gyp['ldflags'],
+		lib=from_gyp['libraries'],
+
+		use='UV_FLAGS',
+
+		target='uv',
+		name='LIBUV')
+
+def build(ctx):
+	build_uv(ctx)
+
+# vim: set ts=4 sts=4 noet :
