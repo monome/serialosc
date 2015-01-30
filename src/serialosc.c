@@ -20,7 +20,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#include <uv.h>
 #include <monome.h>
+
 #include "serialosc.h"
 
 static void
@@ -44,6 +46,8 @@ main(int argc, char **argv)
 #ifdef WIN32
 	setvbuf(stdout, NULL, _IONBF, 0);
 	setvbuf(stderr, NULL, _IONBF, 0);
+#else
+	uv_setup_args(argc, argv);
 #endif
 
 	if (argc < 2) {
@@ -71,10 +75,19 @@ main(int argc, char **argv)
 			return EXIT_SUCCESS;
 	}
 
-	/* if the only parameter is -v, print the version and exit */
-	if (argv[1][0] == '-' && argv[1][1] == 'v') {
-		print_version();
-		return EXIT_SUCCESS;
+	/* handle short options */
+	if (argv[1][0] == '-') {
+		switch (argv[1][1]) {
+		case 'v':
+			print_version();
+			return EXIT_SUCCESS;
+
+		case 'd':
+			uv_set_process_title("serialosc [detector]");
+			if (sosc_detector_run(argv[0]))
+				return EXIT_FAILURE;
+			return EXIT_SUCCESS;
+		}
 	}
 
 	/* otherwise, we'll run as a per-device server. this next odd line

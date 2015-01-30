@@ -29,62 +29,111 @@ struct device_info {
 
 	char *serial;
 	char *friendly;
+
+	uv_process_t process;
 };
 
-struct detector_state {
+struct supervisor_state {
+	uv_loop_t *loop;
+
 	VECTOR(devices, struct device_info) devices;
+
+	struct {
+		uv_process_t proc;
+		int pipe_fd;
+		uv_poll_t pipe_poll;
+	} detector;
 };
 
 static void
-supervisor_main(int detector_fd)
+detector_pipe_cb(uv_poll_t *handle, int status, int events)
 {
-	uv_pipe_t from_detector;
-	uv_loop_t *loop;
+	struct supervisor_state *self = container_of(handle,
+			struct supervisor_state, detector.pipe_poll);
 
-	loop = uv_default_loop();
+	char buf[256];
 
-	uv_pipe_init(loop, &from_detector, 0);
-	uv_pipe_open(&from_detector, detector_fd);
+	printf("%d %d %zd\n", status, events,
+			read(self->detector.pipe_fd, buf, sizeof(buf)));
+}
 
-	uv_read_start((uv_stream_t *) &from_detector, 
+static int
+launch_detector(struct supervisor_state *self)
+{
+	struct uv_process_options_s options;
+	char path_buf[1024];
+	int pipefds[2], err;
+	size_t len;
 
-	uv_loop_close(loop);
+	len = sizeof(path_buf);
+	err = uv_exepath(path_buf, &len);
+	if (err < 0) {
+		fprintf(stderr, "launch_detector() failed in uv_exepath(): %s\n",
+				uv_strerror(err));
+
+		return err;
+	}
+
+	err = pipe(pipefds);
+	if (err < 0) {
+		perror("launch_detector() failed in pipe()");
+		return err;
+	}
+
+	options = (struct uv_process_options_s) {
+		.exit_cb = NULL,
+
+		.file    = path_buf,
+		.args    = (char *[]) {path_buf, "-d", NULL},
+		.flags   = UV_PROCESS_WINDOWS_HIDE,
+
+		.stdio_count = 2,
+		.stdio = (struct uv_stdio_container_s []) {
+			[STDIN_FILENO] = {
+				.flags = UV_IGNORE
+			},
+
+			[STDOUT_FILENO] = {
+				.flags = UV_INHERIT_FD,
+				.data.fd = pipefds[1]
+			}
+		},
+	};
+
+	err = uv_spawn(self->loop, &self->detector.proc, &options);
+	if (err < 0) {
+		fprintf(stderr, "launch_detector() failed in uv_spawn(): %s\n",
+				uv_strerror(err));
+		return err;
+	}
+
+	self->detector.pipe_fd = pipefds[0];
+	close(pipefds[1]);
+	return 0;
 }
 
 int
 sosc_supervisor_run(char *progname)
 {
-	int pipefds[2];
+	struct supervisor_state self;
 
 	sosc_config_create_directory();
 
-	if (pipe(pipefds) < 0) {
-		perror("sosc_supervisor_run() pipe");
-		return 0;
-	}
+	self.loop = uv_default_loop();
+	if (launch_detector(&self))
+		goto err_detector;
 
-	switch (fork()) {
-	case 0:
-		close(pipefds[0]);
-		dup2(pipefds[1], STDOUT_FILENO);
-		break;
+	uv_set_process_title("serialosc [supervisor]");
 
-	case -1:
-		perror("sosc_supervisor_run() fork");
-		return 1;
+	uv_poll_init(self.loop, &self.detector.pipe_poll, self.detector.pipe_fd);
+	uv_poll_start(&self.detector.pipe_poll, UV_READABLE, detector_pipe_cb);
 
-	default:
-		close(pipefds[1]);
-		supervisor_main(pipefds[0]);
-		return 0;
-	}
+	uv_run(self.loop, UV_RUN_DEFAULT);
 
-	/* XXX: use uv_set_process_title() */
-	progname[strlen(progname) - 1] = 'm';
-
-	/* run as the detector process */
-	if (sosc_detector_run(progname))
-		return 1;
-
+	uv_loop_close(self.loop);
 	return 0;
+
+err_detector:
+	uv_loop_close(self.loop);
+	return -1;
 }

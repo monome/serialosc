@@ -32,6 +32,9 @@
 #define SOSC_SUPERVISOR_OSC_PORT "12002"
 #define SOSC_WIN_SERVICE_NAME "serialosc"
 
+#define container_of(ptr, type, member) \
+	((type *) ((char *) (ptr) - offsetof(type, member)))
+
 typedef struct {
 	struct {
 		char port[6];
