@@ -313,7 +313,12 @@ device_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 {
 	DEV_FROM(process, subprocess.proc);
 
-	osc_notify(dev->supervisor, dev, SOSC_DEVICE_DISCONNECTION);
+	if (dev->ready) {
+		fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
+				dev->serial);
+
+		osc_notify(dev->supervisor, dev, SOSC_DEVICE_DISCONNECTION);
+	}
 
 	uv_close((void *) &dev->subprocess.proc, NULL);
 	uv_close((void *) &dev->subprocess.poll, device_poll_close_cb);
@@ -342,11 +347,13 @@ handle_device_msg(struct sosc_supervisor *self,
 
 	case SOSC_DEVICE_READY:
 		dev->ready = 1;
+
 		osc_notify(self, dev, SOSC_DEVICE_CONNECTION);
+		fprintf(stderr, "serialosc [%s]: connected, server running on port %d\n",
+				dev->serial, dev->port);
 		return 0;
 
 	case SOSC_DEVICE_DISCONNECTION:
-		/* XXX: may not actually need this, can we just use exit_cb()? */
 		return 0;
 	}
 
