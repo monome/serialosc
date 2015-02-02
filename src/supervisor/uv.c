@@ -209,6 +209,23 @@ OSC_HANDLER_FUNC(add_notification_endpoint)
 	return 0;
 }
 
+OSC_HANDLER_FUNC(report_version)
+{
+	struct sosc_supervisor *self = user_data;
+	lo_address *dst;
+	char port[6];
+
+	portstr(port, argv[1]->i);
+	if (!(dst = lo_address_new(&argv[0]->s, port)))
+		return 1;
+
+	lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE, "/serialosc/version",
+			"ss", VERSION, GIT_COMMIT);
+
+	lo_address_free(dst);
+	return 0;
+}
+
 static void
 osc_poll_cb(uv_poll_t *handle, int status, int events)
 {
@@ -226,6 +243,8 @@ init_osc_server(struct sosc_supervisor *self)
 			"/serialosc/list", "si", list_devices, self);
 	lo_server_add_method(self->osc.server,
 			"/serialosc/notify", "si", add_notification_endpoint, self);
+	lo_server_add_method(self->osc.server,
+			"/serialosc/version", "si", report_version, self);
 
 	uv_poll_init(self->loop, &self->osc.poll,
 			lo_server_get_socket_fd(self->osc.server));
