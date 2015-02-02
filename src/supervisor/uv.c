@@ -48,6 +48,11 @@ struct sosc_subprocess {
 	uv_poll_t poll;
 };
 
+struct sosc_notification_endpoint {
+	char host[128];
+	char port[6];
+};
+
 struct sosc_supervisor {
 	uv_loop_t *loop;
 
@@ -57,6 +62,12 @@ struct sosc_supervisor {
 		lo_server *server;
 		uv_poll_t poll;
 	} osc;
+
+	VECTOR(sosc_notifications, struct sosc_notification_endpoint)
+		notifications;
+
+	int notifications_were_sent;
+	uv_check_t drain_notifications;
 };
 
 struct sosc_device_subprocess {
@@ -138,14 +149,26 @@ err_exepath:
  * osc
  *************************************************************************/
 
+static int
+portstr(char *dest, int src)
+{
+	return snprintf(dest, 6, "%d", src);
+}
+
 OSC_HANDLER_FUNC(list_devices)
 {
-	puts("sup fool");
 	return 0;
 }
 
 OSC_HANDLER_FUNC(add_notification_endpoint)
 {
+	struct sosc_supervisor *self = user_data;
+	struct sosc_notification_endpoint n;
+
+	portstr(n.port, argv[1]->i);
+	sosc_strlcpy(n.host, &argv[0]->s, sizeof(n.host));
+
+	VECTOR_PUSH_BACK(&self->notifications, n);
 	return 0;
 }
 
@@ -170,6 +193,46 @@ init_osc_server(struct sosc_supervisor *self)
 	uv_poll_init(self->loop, &self->osc.poll,
 			lo_server_get_socket_fd(self->osc.server));
 
+	return 0;
+}
+
+static int
+osc_notify(struct sosc_supervisor *self, struct sosc_device_subprocess *dev,
+		sosc_ipc_type_t type)
+{
+	struct sosc_notification_endpoint *n;
+	const char *path;
+	lo_address dst;
+	int i;
+
+	switch (type) {
+	case SOSC_DEVICE_CONNECTION:
+		path = "/serialosc/add";
+		break;
+
+	case SOSC_DEVICE_DISCONNECTION:
+		path = "/serialosc/remove";
+		break;
+
+	default:
+		return -1;
+	}
+
+	for (i = 0; i < self->notifications.size; i++) {
+		n = &self->notifications.data[i];
+
+		if (!(dst = lo_address_new(n->host, n->port))) {
+			fprintf(stderr, "notify(): couldn't allocate lo_address\n");
+			continue;
+		}
+
+		lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE, path, "ssi",
+		             dev->serial, dev->friendly, dev->port);
+
+		lo_address_free(dst);
+	}
+
+	self->notifications_were_sent = 1;
 	return 0;
 }
 
@@ -199,32 +262,23 @@ device_fini(struct sosc_device_subprocess *dev)
 }
 
 static void
-device_proc_close_cb(uv_handle_t *handle)
-{
-	DEV_FROM(handle, subprocess.proc);
-
-	device_fini(dev);
-	free(dev);
-}
-
-static void
 device_poll_close_cb(uv_handle_t *handle)
 {
 	DEV_FROM(handle, subprocess.poll);
 
 	close(dev->subprocess.pipe_fd);
-	dev->subprocess.pipe_fd = -1;
-
-	/* this is a slightly gnarly chain of callbacks but it's necessary
-	 * (i think, at least) to make sure the subproces close_cb() doesn't
-	 * happen after the poll close_cb(). */
-	uv_close((void *) &dev->subprocess.proc, device_proc_close_cb);
+	device_fini(dev);
+	free(dev);
 }
 
 static void
 device_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 {
 	DEV_FROM(process, subprocess.proc);
+
+	osc_notify(dev->supervisor, dev, SOSC_DEVICE_DISCONNECTION);
+
+	uv_close((void *) &dev->subprocess.proc, NULL);
 	uv_close((void *) &dev->subprocess.poll, device_poll_close_cb);
 }
 
@@ -251,7 +305,7 @@ handle_device_msg(struct sosc_supervisor *self,
 
 	case SOSC_DEVICE_READY:
 		dev->ready = 1;
-		/* XXX: notify */
+		osc_notify(self, dev, SOSC_DEVICE_CONNECTION);
 		return 0;
 
 	case SOSC_DEVICE_DISCONNECTION:
@@ -333,6 +387,17 @@ detector_pipe_cb(uv_poll_t *handle, int status, int events)
  * entry point
  *************************************************************************/
 
+static void
+drain_notifications_cb(uv_check_t *handle)
+{
+	SELF_FROM(handle, drain_notifications);
+
+	if (self->notifications_were_sent) {
+		VECTOR_CLEAR(&self->notifications);
+		self->notifications_were_sent = 0;
+	}
+}
+
 int
 sosc_supervisor_run(char *progname)
 {
@@ -341,6 +406,7 @@ sosc_supervisor_run(char *progname)
 	sosc_config_create_directory();
 
 	self.loop = uv_default_loop();
+	VECTOR_INIT(&self.notifications, 32);
 
 	if (init_osc_server(&self))
 		goto err_osc_server;
@@ -355,9 +421,15 @@ sosc_supervisor_run(char *progname)
 	uv_poll_start(&self.detector.poll, UV_READABLE, detector_pipe_cb);
 	uv_poll_start(&self.osc.poll, UV_READABLE, osc_poll_cb);
 
+	self.notifications_were_sent = 0;
+	uv_check_init(self.loop, &self.drain_notifications);
+	uv_check_start(&self.drain_notifications, drain_notifications_cb);
+
 	uv_run(self.loop, UV_RUN_DEFAULT);
 
+	VECTOR_FREE(&self.notifications);
 	uv_loop_close(self.loop);
+
 	return 0;
 
 err_detector:

@@ -74,6 +74,7 @@ int sosc_config_read(const char *serial, sosc_config_t *config);
 int sosc_config_write(const char *serial, sosc_state_t *state);
 
 void sosc_port_itos(char *dest, long int port);
+size_t sosc_strlcpy(char *dst, const char *src, size_t size);
 
 void sosc_zeroconf_init(void);
 void sosc_zeroconf_register(sosc_state_t *state, const char *svc_name);
