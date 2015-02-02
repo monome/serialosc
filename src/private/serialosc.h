@@ -51,7 +51,7 @@ typedef struct {
 	} dev;
 } sosc_config_t;
 
-typedef struct {
+typedef struct sosc_state {
 	monome_t *monome;
 	lo_address *outgoing;
 	lo_server *server;

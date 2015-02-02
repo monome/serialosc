@@ -83,11 +83,7 @@ def build(bld):
 			if not bld.env.SOSC_NO_ZEROCONF:
 				obj("zeroconf/darwin.c")
 
-		if bld.is_defined("HAVE_WORKING_POLL"):
-			obj("event_loop/poll.c")
-		else:
-			obj("event_loop/select.c")
-
+		obj("event_loop/uv.c")
 
 	#
 	# common
