@@ -22,43 +22,57 @@
 #include <wwrl/vector_stdlib.h>
 
 #include "serialosc.h"
+#include "ipc.h"
+#include "osc.h"
 
-struct device_info {
+#define SELF_FROM(p, member) struct sosc_supervisor *self = container_of(p,	\
+		struct sosc_supervisor, member)
+
+#define DEV_FROM(p, member) struct sosc_device_subprocess *dev = \
+	container_of(p, struct sosc_device_subprocess, member);
+
+/*************************************************************************
+ * datastructures and utilities
+ *************************************************************************/
+
+/* we set the `data` member (which is a void*) of the libuv
+ * sosc_subprocess.proc structure to either of these values to indicate
+ * what kind of subprocess it is. this is so that we can send responses to
+ * a /serialosc/list by doing a uv_walk() on our run loop. */
+int detector_type = 0;
+int device_type = 0;
+
+struct sosc_subprocess {
+	uv_process_t proc;
+	int pipe_fd;
+	uv_poll_t poll;
+};
+
+struct sosc_supervisor {
+	uv_loop_t *loop;
+
+	struct sosc_subprocess detector;
+
+	struct {
+		lo_server *server;
+		uv_poll_t poll;
+	} osc;
+};
+
+struct sosc_device_subprocess {
+	struct sosc_subprocess subprocess;
+	struct sosc_supervisor *supervisor;
+
 	int ready;
 	int port;
 
 	char *serial;
 	char *friendly;
-
-	uv_process_t process;
 };
-
-struct supervisor_state {
-	uv_loop_t *loop;
-
-	VECTOR(devices, struct device_info) devices;
-
-	struct {
-		uv_process_t proc;
-		int pipe_fd;
-		uv_poll_t pipe_poll;
-	} detector;
-};
-
-static void
-detector_pipe_cb(uv_poll_t *handle, int status, int events)
-{
-	struct supervisor_state *self = container_of(handle,
-			struct supervisor_state, detector.pipe_poll);
-
-	char buf[256];
-
-	printf("%d %d %zd\n", status, events,
-			read(self->detector.pipe_fd, buf, sizeof(buf)));
-}
 
 static int
-launch_detector(struct supervisor_state *self)
+launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
+		uv_exit_cb exit_cb, char *arg)
 {
 	struct uv_process_options_s options;
 	char path_buf[1024];
@@ -68,23 +82,23 @@ launch_detector(struct supervisor_state *self)
 	len = sizeof(path_buf);
 	err = uv_exepath(path_buf, &len);
 	if (err < 0) {
-		fprintf(stderr, "launch_detector() failed in uv_exepath(): %s\n",
+		fprintf(stderr, "launch_subprocess() failed in uv_exepath(): %s\n",
 				uv_strerror(err));
 
-		return err;
+		goto err_exepath;
 	}
 
 	err = pipe(pipefds);
 	if (err < 0) {
-		perror("launch_detector() failed in pipe()");
-		return err;
+		perror("launch_subprocess() failed in pipe()");
+		goto err_pipe;
 	}
 
 	options = (struct uv_process_options_s) {
-		.exit_cb = NULL,
+		.exit_cb = exit_cb,
 
 		.file    = path_buf,
-		.args    = (char *[]) {path_buf, "-d", NULL},
+		.args    = (char *[]) {path_buf, arg, NULL},
 		.flags   = UV_PROCESS_WINDOWS_HIDE,
 
 		.stdio_count = 2,
@@ -100,33 +114,246 @@ launch_detector(struct supervisor_state *self)
 		},
 	};
 
-	err = uv_spawn(self->loop, &self->detector.proc, &options);
+	err = uv_spawn(self->loop, &proc->proc, &options);
+	close(pipefds[1]);
+
 	if (err < 0) {
-		fprintf(stderr, "launch_detector() failed in uv_spawn(): %s\n",
+		fprintf(stderr, "launch_subprocess() failed in uv_spawn(): %s\n",
 				uv_strerror(err));
-		return err;
+		goto err_spawn;
 	}
 
-	self->detector.pipe_fd = pipefds[0];
-	close(pipefds[1]);
+	proc->pipe_fd = pipefds[0];
+	uv_poll_init(self->loop, &proc->poll, proc->pipe_fd);
+	return 0;
+
+err_spawn:
+	close(pipefds[0]);
+err_pipe:
+err_exepath:
+	return err;
+}
+
+/*************************************************************************
+ * osc
+ *************************************************************************/
+
+OSC_HANDLER_FUNC(list_devices)
+{
+	puts("sup fool");
 	return 0;
 }
+
+OSC_HANDLER_FUNC(add_notification_endpoint)
+{
+	return 0;
+}
+
+static void
+osc_poll_cb(uv_poll_t *handle, int status, int events)
+{
+	SELF_FROM(handle, osc.poll);
+	lo_server_recv_noblock(self->osc.server, 0);
+}
+
+static int
+init_osc_server(struct sosc_supervisor *self)
+{
+	if (!(self->osc.server = lo_server_new(SOSC_SUPERVISOR_OSC_PORT, NULL)))
+		return -1;
+
+	lo_server_add_method(self->osc.server,
+			"/serialosc/list", "si", list_devices, self);
+	lo_server_add_method(self->osc.server,
+			"/serialosc/notify", "si", add_notification_endpoint, self);
+
+	uv_poll_init(self->loop, &self->osc.poll,
+			lo_server_get_socket_fd(self->osc.server));
+
+	return 0;
+}
+
+/*************************************************************************
+ * device lifecycle
+ *************************************************************************/
+
+static void device_exit_cb(uv_process_t *, int64_t, int);
+
+static int
+device_init(struct sosc_supervisor *self, struct sosc_device_subprocess *dev,
+		char *devnode)
+{
+	if (launch_subprocess(self, &dev->subprocess, device_exit_cb, devnode))
+		return -1;
+
+	dev->supervisor = self;
+	dev->subprocess.proc.data = &device_type;
+	return 0;
+}
+
+static void
+device_fini(struct sosc_device_subprocess *dev)
+{
+	s_free(dev->serial);
+	s_free(dev->friendly);
+}
+
+static void
+device_proc_close_cb(uv_handle_t *handle)
+{
+	DEV_FROM(handle, subprocess.proc);
+
+	device_fini(dev);
+	free(dev);
+}
+
+static void
+device_poll_close_cb(uv_handle_t *handle)
+{
+	DEV_FROM(handle, subprocess.poll);
+
+	close(dev->subprocess.pipe_fd);
+	dev->subprocess.pipe_fd = -1;
+
+	/* this is a slightly gnarly chain of callbacks but it's necessary
+	 * (i think, at least) to make sure the subproces close_cb() doesn't
+	 * happen after the poll close_cb(). */
+	uv_close((void *) &dev->subprocess.proc, device_proc_close_cb);
+}
+
+static void
+device_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
+{
+	DEV_FROM(process, subprocess.proc);
+	uv_close((void *) &dev->subprocess.poll, device_poll_close_cb);
+}
+
+/*************************************************************************
+ * device communication
+ *************************************************************************/
+
+static int
+handle_device_msg(struct sosc_supervisor *self,
+		struct sosc_device_subprocess *dev, struct sosc_ipc_msg *msg)
+{
+	switch (msg->type) {
+	case SOSC_DEVICE_CONNECTION:
+		return -1;
+
+	case SOSC_OSC_PORT_CHANGE:
+		dev->port = msg->port_change.port;
+		return 0;
+
+	case SOSC_DEVICE_INFO:
+		dev->serial   = msg->device_info.serial;
+		dev->friendly = msg->device_info.friendly;
+		return 0;
+
+	case SOSC_DEVICE_READY:
+		dev->ready = 1;
+		/* XXX: notify */
+		return 0;
+
+	case SOSC_DEVICE_DISCONNECTION:
+		/* XXX: may not actually need this, can we just use exit_cb()? */
+		return 0;
+	}
+
+	return 0;
+}
+
+/*************************************************************************
+ * detector communication
+ *************************************************************************/
+
+static void device_pipe_cb(uv_poll_t *, int status, int events);
+
+static int
+handle_connection(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
+{
+	struct sosc_device_subprocess *dev;
+
+	if (!(dev = calloc(1, sizeof(*dev))))
+		goto err_calloc;
+
+	if (device_init(self, dev, msg->connection.devnode))
+		goto err_init;
+
+	uv_poll_start(&dev->subprocess.poll, UV_READABLE, device_pipe_cb);
+	return 0;
+
+err_init:
+	free(dev);
+err_calloc:
+	return -1;
+}
+
+static int
+handle_detector_msg(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
+{
+	switch (msg->type) {
+	case SOSC_DEVICE_CONNECTION:
+		return handle_connection(self, msg);
+
+	case SOSC_OSC_PORT_CHANGE:
+	case SOSC_DEVICE_INFO:
+	case SOSC_DEVICE_READY:
+	case SOSC_DEVICE_DISCONNECTION:
+		return -1;
+	}
+
+	return 0;
+}
+
+/*************************************************************************
+ * subprocess callbacks
+ *************************************************************************/
+
+static void
+device_pipe_cb(uv_poll_t *handle, int status, int events)
+{
+	DEV_FROM(handle, subprocess.poll);
+	struct sosc_ipc_msg msg;
+
+	if (sosc_ipc_msg_read(dev->subprocess.pipe_fd, &msg) > 0)
+		handle_device_msg(dev->supervisor, dev, &msg);
+}
+
+static void
+detector_pipe_cb(uv_poll_t *handle, int status, int events)
+{
+	SELF_FROM(handle, detector.poll);
+	struct sosc_ipc_msg msg;
+
+	if (sosc_ipc_msg_read(self->detector.pipe_fd, &msg) > 0)
+		handle_detector_msg(self, &msg);
+}
+
+/*************************************************************************
+ * entry point
+ *************************************************************************/
 
 int
 sosc_supervisor_run(char *progname)
 {
-	struct supervisor_state self;
+	struct sosc_supervisor self;
 
 	sosc_config_create_directory();
 
 	self.loop = uv_default_loop();
-	if (launch_detector(&self))
+
+	if (init_osc_server(&self))
+		goto err_osc_server;
+
+	if (launch_subprocess(&self, &self.detector, NULL, "-d"))
 		goto err_detector;
+
+	self.detector.proc.data = &detector_type;
 
 	uv_set_process_title("serialosc [supervisor]");
 
-	uv_poll_init(self.loop, &self.detector.pipe_poll, self.detector.pipe_fd);
-	uv_poll_start(&self.detector.pipe_poll, UV_READABLE, detector_pipe_cb);
+	uv_poll_start(&self.detector.poll, UV_READABLE, detector_pipe_cb);
+	uv_poll_start(&self.osc.poll, UV_READABLE, osc_poll_cb);
 
 	uv_run(self.loop, UV_RUN_DEFAULT);
 
@@ -134,6 +361,8 @@ sosc_supervisor_run(char *progname)
 	return 0;
 
 err_detector:
+	lo_server_free(self.osc.server);
+err_osc_server:
 	uv_loop_close(self.loop);
 	return -1;
 }
