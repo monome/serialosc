@@ -155,8 +155,45 @@ portstr(char *dest, int src)
 	return snprintf(dest, 6, "%d", src);
 }
 
+struct walk_cb_args {
+	struct sosc_supervisor *self;
+	lo_address *dst;
+};
+
+static void
+list_devices_walk_cb(uv_handle_t *handle, void *_args)
+{
+	struct walk_cb_args *args = _args;
+	struct sosc_supervisor *self = args->self;
+	lo_address *dst = args->dst;
+	struct sosc_device_subprocess *dev;
+
+	if (handle->data != &device_type)
+		return;
+
+	dev = container_of(handle, struct sosc_device_subprocess, subprocess.proc);
+
+	lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE, "/serialosc/device",
+			"ssi", dev->serial, dev->friendly, dev->port);
+}
+
 OSC_HANDLER_FUNC(list_devices)
 {
+	struct sosc_supervisor *self = user_data;
+	struct walk_cb_args args;
+	char port[6];
+
+	portstr(port, argv[1]->i);
+
+	args.self = self;
+	args.dst  = lo_address_new(&argv[0]->s, port);
+
+	if (!args.dst)
+		return 1;
+
+	uv_walk(self->loop, list_devices_walk_cb, &args);
+
+	lo_address_free(args.dst);
 	return 0;
 }
 
@@ -401,7 +438,7 @@ drain_notifications_cb(uv_check_t *handle)
 int
 sosc_supervisor_run(char *progname)
 {
-	struct sosc_supervisor self;
+	struct sosc_supervisor self = {NULL};
 
 	sosc_config_create_directory();
 
