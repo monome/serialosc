@@ -318,13 +318,21 @@ device_fini(struct sosc_device_subprocess *dev)
 }
 
 static void
+device_proc_close_cb(uv_handle_t *handle)
+{
+	DEV_FROM(handle, subprocess.proc);
+
+	device_fini(dev);
+	free(dev);
+}
+
+static void
 device_poll_close_cb(uv_handle_t *handle)
 {
 	DEV_FROM(handle, subprocess.poll);
 
 	close(dev->subprocess.pipe_fd);
-	device_fini(dev);
-	free(dev);
+	uv_close((void *) &dev->subprocess.proc, device_proc_close_cb);
 }
 
 static void
@@ -339,7 +347,6 @@ device_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 		osc_notify(dev->supervisor, dev, SOSC_DEVICE_DISCONNECTION);
 	}
 
-	uv_close((void *) &dev->subprocess.proc, NULL);
 	uv_close((void *) &dev->subprocess.poll, device_poll_close_cb);
 }
 
