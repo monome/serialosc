@@ -65,6 +65,11 @@ struct sosc_supervisor {
 	struct sosc_subprocess detector;
 
 	struct {
+		uv_idle_t check;
+		int pending;
+	} state_change;
+
+	struct {
 		lo_server *server;
 		uv_poll_t poll;
 	} osc;
@@ -159,6 +164,47 @@ static void detector_exit_cb(uv_process_t *, int64_t, int);
 static void detector_pipe_cb(uv_poll_t *, int, int);
 
 static void
+remaining_subprocesses_walk_cb(uv_handle_t *handle, void *args)
+{
+	int *subprocs_remaining = args;
+
+	if (handle->data == &device_type || handle->data == &detector_type)
+		(*subprocs_remaining)++;
+}
+
+static void
+state_change_check_cb(uv_idle_t *handle)
+{
+	SELF_FROM(handle, state_change.check);
+	int subprocs_remaining;
+
+	switch (self->state_change.pending) {
+	case SERIALOSC_ENABLED:
+		/* nothing async to check, would have caught any issues in
+		 * supervisor__change_state(). only doing this async for the shared
+		 * code path with SERIALOSC_DISABLED. */
+		goto done;
+
+	case SERIALOSC_DISABLED:
+		subprocs_remaining = 0;
+		uv_walk(self->loop, remaining_subprocesses_walk_cb,
+				&subprocs_remaining);
+
+		/* only finish the transition into SERIALOSC_DISABLED if all of
+		 * our subprocesses have terminated. */
+		if (!subprocs_remaining)
+			goto done;
+		break;
+	}
+
+	return;
+
+done:
+	self->state = self->state_change.pending;
+	uv_idle_stop(handle);
+}
+
+static void
 kill_devices_walk_cb(uv_handle_t *handle, void *_args)
 {
 	if (handle->data != &device_type)
@@ -171,7 +217,8 @@ static int
 supervisor__change_state(struct sosc_supervisor *self,
 		sosc_supervisor_state_t new_state)
 {
-	if (self->state == new_state)
+	if (self->state == new_state
+			|| uv_is_active((void *) &self->state_change.check))
 		return -1;
 
 	switch (new_state) {
@@ -179,6 +226,7 @@ supervisor__change_state(struct sosc_supervisor *self,
 		if (launch_subprocess(self, &self->detector, detector_exit_cb, "-d"))
 			return -1;
 
+		self->detector.proc.data = &detector_type;
 		uv_poll_start(&self->detector.poll, UV_READABLE, detector_pipe_cb);
 		break;
 
@@ -191,9 +239,11 @@ supervisor__change_state(struct sosc_supervisor *self,
 		return -1;
 	}
 
-	/* XXX: should this line be asynchronous? seems correct to avoid any
-	 *      serious race conditions which may arise. */
-	self->state = new_state;
+	/* we do this async check thing to prevent race conditions in which
+	 * a supervisor_enable() happens before we've finished tearing down
+	 * from a recent supervisor_disable(). */
+	self->state_change.pending = new_state;
+	uv_idle_start(&self->state_change.check, state_change_check_cb);
 	return 0;
 }
 
@@ -547,6 +597,8 @@ detector_poll_close_cb(uv_handle_t *handle)
 {
 	SELF_FROM(handle, detector.poll);
 	close(self->detector.pipe_fd);
+
+	uv_close((void *) &self->detector.proc, NULL);
 }
 
 static void
@@ -554,7 +606,6 @@ detector_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 {
 	SELF_FROM(process, detector.proc);
 
-	uv_close((void *) &self->detector.proc, NULL);
 	uv_close((void *) &self->detector.poll, detector_poll_close_cb);
 }
 
@@ -591,16 +642,16 @@ sosc_supervisor_run(char *progname)
 	sosc_config_create_directory();
 
 	self.loop  = uv_default_loop();
-	self.state = SERIALOSC_DISABLED;
 	VECTOR_INIT(&self.notifications, 32);
+
+	uv_idle_init(self.loop, &self.state_change.check);
+	self.state = SERIALOSC_DISABLED;
 
 	if (init_osc_server(&self))
 		goto err_osc_server;
 
 	if (supervisor_enable(&self))
 		goto err_enable;
-
-	self.detector.proc.data = &detector_type;
 
 	uv_set_process_title("serialosc [supervisor]");
 
