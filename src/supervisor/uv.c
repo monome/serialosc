@@ -156,6 +156,7 @@ err_exepath:
  *************************************************************************/
 
 static void detector_exit_cb(uv_process_t *, int64_t, int);
+static void detector_pipe_cb(uv_poll_t *, int, int);
 
 static void
 kill_devices_walk_cb(uv_handle_t *handle, void *_args)
@@ -177,6 +178,8 @@ supervisor__change_state(struct sosc_supervisor *self,
 	case SERIALOSC_ENABLED:
 		if (launch_subprocess(self, &self->detector, detector_exit_cb, "-d"))
 			return -1;
+
+		uv_poll_start(&self->detector.poll, UV_READABLE, detector_pipe_cb);
 		break;
 
 	case SERIALOSC_DISABLED:
@@ -601,7 +604,6 @@ sosc_supervisor_run(char *progname)
 
 	uv_set_process_title("serialosc [supervisor]");
 
-	uv_poll_start(&self.detector.poll, UV_READABLE, detector_pipe_cb);
 	uv_poll_start(&self.osc.poll, UV_READABLE, osc_poll_cb);
 
 	self.notifications_were_sent = 0;
