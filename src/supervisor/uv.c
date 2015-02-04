@@ -42,6 +42,11 @@
 int detector_type = 0;
 int device_type = 0;
 
+typedef enum {
+	SERIALOSC_DISABLED = 0,
+	SERIALOSC_ENABLED  = 1
+} sosc_supervisor_state_t;
+
 struct sosc_subprocess {
 	uv_process_t proc;
 	int pipe_fd;
@@ -55,6 +60,7 @@ struct sosc_notification_endpoint {
 
 struct sosc_supervisor {
 	uv_loop_t *loop;
+	sosc_supervisor_state_t state;
 
 	struct sosc_subprocess detector;
 
@@ -146,6 +152,61 @@ err_exepath:
 }
 
 /*************************************************************************
+ * supervisor state changes
+ *************************************************************************/
+
+static void detector_exit_cb(uv_process_t *, int64_t, int);
+
+static void
+kill_devices_walk_cb(uv_handle_t *handle, void *_args)
+{
+	if (handle->data != &device_type)
+		return;
+
+	uv_process_kill((void *) handle, SIGTERM);
+}
+
+static int
+supervisor__change_state(struct sosc_supervisor *self,
+		sosc_supervisor_state_t new_state)
+{
+	if (self->state == new_state)
+		return -1;
+
+	switch (new_state) {
+	case SERIALOSC_ENABLED:
+		if (launch_subprocess(self, &self->detector, detector_exit_cb, "-d"))
+			return -1;
+		break;
+
+	case SERIALOSC_DISABLED:
+		uv_process_kill(&self->detector.proc, SIGTERM);
+		uv_walk(self->loop, kill_devices_walk_cb, NULL);
+		break;
+
+	default:
+		return -1;
+	}
+
+	/* XXX: should this line be asynchronous? seems correct to avoid any
+	 *      serious race conditions which may arise. */
+	self->state = new_state;
+	return 0;
+}
+
+static int
+supervisor_enable(struct sosc_supervisor *self)
+{
+	return supervisor__change_state(self, SERIALOSC_ENABLED);
+}
+
+static int
+supervisor_disable(struct sosc_supervisor *self)
+{
+	return supervisor__change_state(self, SERIALOSC_DISABLED);
+}
+
+/*************************************************************************
  * osc
  *************************************************************************/
 
@@ -177,7 +238,7 @@ list_devices_walk_cb(uv_handle_t *handle, void *_args)
 			"ssi", dev->serial, dev->friendly, dev->port);
 }
 
-OSC_HANDLER_FUNC(list_devices)
+OSC_HANDLER_FUNC(osc_list_devices)
 {
 	struct sosc_supervisor *self = user_data;
 	struct walk_cb_args args;
@@ -197,7 +258,7 @@ OSC_HANDLER_FUNC(list_devices)
 	return 0;
 }
 
-OSC_HANDLER_FUNC(add_notification_endpoint)
+OSC_HANDLER_FUNC(osc_add_notification_endpoint)
 {
 	struct sosc_supervisor *self = user_data;
 	struct sosc_notification_endpoint n;
@@ -209,7 +270,21 @@ OSC_HANDLER_FUNC(add_notification_endpoint)
 	return 0;
 }
 
-OSC_HANDLER_FUNC(report_version)
+OSC_HANDLER_FUNC(osc_handle_enable)
+{
+	struct sosc_supervisor *self = user_data;
+	supervisor_enable(self);
+	return 0;
+}
+
+OSC_HANDLER_FUNC(osc_handle_disable)
+{
+	struct sosc_supervisor *self = user_data;
+	supervisor_disable(self);
+	return 0;
+}
+
+OSC_HANDLER_FUNC(osc_report_status)
 {
 	struct sosc_supervisor *self = user_data;
 	lo_address *dst;
@@ -219,8 +294,25 @@ OSC_HANDLER_FUNC(report_version)
 	if (!(dst = lo_address_new(&argv[0]->s, port)))
 		return 1;
 
-	lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE, "/serialosc/version",
-			"ss", VERSION, GIT_COMMIT);
+	lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE,
+			"/serialosc/status", "i", self->state);
+
+	lo_address_free(dst);
+	return 0;
+}
+
+OSC_HANDLER_FUNC(osc_report_version)
+{
+	struct sosc_supervisor *self = user_data;
+	lo_address *dst;
+	char port[6];
+
+	portstr(port, argv[1]->i);
+	if (!(dst = lo_address_new(&argv[0]->s, port)))
+		return 1;
+
+	lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE,
+			"/serialosc/version", "ss", VERSION, GIT_COMMIT);
 
 	lo_address_free(dst);
 	return 0;
@@ -240,11 +332,19 @@ init_osc_server(struct sosc_supervisor *self)
 		return -1;
 
 	lo_server_add_method(self->osc.server,
-			"/serialosc/list", "si", list_devices, self);
+			"/serialosc/list", "si", osc_list_devices, self);
 	lo_server_add_method(self->osc.server,
-			"/serialosc/notify", "si", add_notification_endpoint, self);
+			"/serialosc/notify", "si", osc_add_notification_endpoint, self);
+
 	lo_server_add_method(self->osc.server,
-			"/serialosc/version", "si", report_version, self);
+			"/serialosc/enable", "", osc_handle_enable, self);
+	lo_server_add_method(self->osc.server,
+			"/serialosc/disable", "", osc_handle_disable, self);
+	lo_server_add_method(self->osc.server,
+			"/serialosc/status", "si", osc_report_status, self);
+
+	lo_server_add_method(self->osc.server,
+			"/serialosc/version", "si", osc_report_version, self);
 
 	uv_poll_init(self->loop, &self->osc.poll,
 			lo_server_get_socket_fd(self->osc.server));
@@ -386,6 +486,16 @@ handle_device_msg(struct sosc_supervisor *self,
 	return 0;
 }
 
+static void
+device_pipe_cb(uv_poll_t *handle, int status, int events)
+{
+	DEV_FROM(handle, subprocess.poll);
+	struct sosc_ipc_msg msg;
+
+	if (sosc_ipc_msg_read(dev->subprocess.pipe_fd, &msg) > 0)
+		handle_device_msg(dev->supervisor, dev, &msg);
+}
+
 /*************************************************************************
  * detector communication
  *************************************************************************/
@@ -429,18 +539,20 @@ handle_detector_msg(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
 	return 0;
 }
 
-/*************************************************************************
- * subprocess callbacks
- *************************************************************************/
+static void
+detector_poll_close_cb(uv_handle_t *handle)
+{
+	SELF_FROM(handle, detector.poll);
+	close(self->detector.pipe_fd);
+}
 
 static void
-device_pipe_cb(uv_poll_t *handle, int status, int events)
+detector_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 {
-	DEV_FROM(handle, subprocess.poll);
-	struct sosc_ipc_msg msg;
+	SELF_FROM(process, detector.proc);
 
-	if (sosc_ipc_msg_read(dev->subprocess.pipe_fd, &msg) > 0)
-		handle_device_msg(dev->supervisor, dev, &msg);
+	uv_close((void *) &self->detector.proc, NULL);
+	uv_close((void *) &self->detector.poll, detector_poll_close_cb);
 }
 
 static void
@@ -475,14 +587,15 @@ sosc_supervisor_run(char *progname)
 
 	sosc_config_create_directory();
 
-	self.loop = uv_default_loop();
+	self.loop  = uv_default_loop();
+	self.state = SERIALOSC_DISABLED;
 	VECTOR_INIT(&self.notifications, 32);
 
 	if (init_osc_server(&self))
 		goto err_osc_server;
 
-	if (launch_subprocess(&self, &self.detector, NULL, "-d"))
-		goto err_detector;
+	if (supervisor_enable(&self))
+		goto err_enable;
 
 	self.detector.proc.data = &detector_type;
 
@@ -502,7 +615,7 @@ sosc_supervisor_run(char *progname)
 
 	return 0;
 
-err_detector:
+err_enable:
 	lo_server_free(self.osc.server);
 err_osc_server:
 	uv_loop_close(self.loop);
