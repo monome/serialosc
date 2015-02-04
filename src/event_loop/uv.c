@@ -1,10 +1,10 @@
 /**
  * Copyright (c) 2010-2015 William Light <wrl@illest.net>
- * 
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -22,15 +22,9 @@
 #define SELF_FROM(p, member) struct sosc_uv_poll *self = container_of(p,	\
 		struct sosc_uv_poll, member)
 
-
 struct sosc_uv_poll {
 	uv_loop_t *loop;
 	uv_poll_t monome_poll, osc_poll;
-	const struct sosc_state *state;
-};
-
-struct sosc_poll {
-	uv_poll_t uv_poll;
 	const struct sosc_state *state;
 };
 
@@ -58,7 +52,7 @@ int
 sosc_event_loop(const struct sosc_state *state)
 {
 	struct sosc_uv_poll self;
-	
+
 	self.state = state;
 	self.loop = uv_default_loop();
 
@@ -73,6 +67,9 @@ sosc_event_loop(const struct sosc_state *state)
 
 	uv_close((void *) &self.osc_poll, NULL);
 	uv_close((void *) &self.monome_poll, NULL);
+
+	/* run once more to make sure libuv cleans up any internal resources. */
+	uv_run(self.loop, UV_RUN_NOWAIT);
 
 	uv_loop_close(self.loop);
 	return 0;
