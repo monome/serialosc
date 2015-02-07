@@ -661,9 +661,14 @@ detector_pipe_cb(uv_poll_t *handle, int status, int events)
  *************************************************************************/
 
 int
-sosc_supervisor_run(char *progname)
+main(int argc, char **argv)
 {
 	struct sosc_supervisor self = {NULL};
+
+	uv_setup_args(argc, argv);
+
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
 
 	sosc_config_create_directory();
 
@@ -678,8 +683,6 @@ sosc_supervisor_run(char *progname)
 
 	if (supervisor_enable(&self))
 		goto err_enable;
-
-	uv_set_process_title("serialosc [supervisor]");
 
 	uv_poll_start(&self.osc.poll, UV_READABLE, osc_poll_cb);
 	uv_check_init(self.loop, &self.drain_notifications);

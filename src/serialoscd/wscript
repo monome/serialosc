@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+
+top = '../..'
+
+def build(ctx):
+	tgt = '../../bin/serialoscd'
+
+	if ctx.env.DEST_OS[:3] == "win":
+		ctx.program(
+			source='windows.c',
+			target=tgt,
+			use='serialosc-common LO')
+	else:
+		ctx.program(
+			source='uv.c',
+			target=tgt,
+			use='serialosc-common LIBUV LO')

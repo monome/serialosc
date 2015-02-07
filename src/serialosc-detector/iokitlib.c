@@ -127,7 +127,7 @@ fini_iokitlib(notify_state_t *state)
 }
 
 int
-sosc_detector_run(const char *exec_path)
+main(int argc, char **argv)
 {
 	notify_state_t state;
 

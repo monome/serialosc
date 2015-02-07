@@ -345,7 +345,7 @@ debug_main(void)
 }
 
 int
-sosc_detector_run(const char *exec_path)
+main(int argc, char **argv)
 {
 	SERVICE_TABLE_ENTRY services[] = {
 		{SOSC_WIN_SERVICE_NAME, service_main},

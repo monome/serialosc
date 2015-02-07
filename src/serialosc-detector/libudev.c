@@ -112,7 +112,7 @@ scan_connected_devices(detector_state_t *state)
 }
 
 int
-sosc_detector_run(const char *exec_path)
+main(int argc, char **argv)
 {
 	detector_state_t state;
 

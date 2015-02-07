@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+top = '../..'
+
+def build(ctx):
+	objs = []
+	obj = lambda src: objs.append(src)
+
+	if ctx.env.SOSC_NO_ZEROCONF:
+		obj('zeroconf/dummy.c')
+	else:
+		obj('zeroconf/common.c')
+
+		if ctx.env.DEST_OS[:3] == "win":
+			obj('zeroconf/windows.c')
+		elif ctx.env.DEST_OS == 'linux':
+			obj('zeroconf/not_darwin.c')
+		elif ctx.env.DEST_OS == 'darwin':
+			obj('zeroconf/darwin.c')
+
+	obj('event_loop/uv.c')
+
+	obj('osc/mext_methods.c')
+	obj('osc/sys_methods.c')
+	obj('osc/util.c')
+
+	obj('server.c')
+	obj('config.c')
+
+	obj('main.c')
+
+	ctx.program(
+		source=objs,
+		target='../../bin/serialosc-device',
+
+		use='serialosc-common LO CONFUSE LIBMONOME DNSSD_INC DL LIBUV')

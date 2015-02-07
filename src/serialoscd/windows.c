@@ -16,6 +16,8 @@
 
 #include <stdio.h>
 
+#include <uv.h>
+
 #define WINVER 0x501
 
 #include <windows.h>
@@ -763,8 +765,13 @@ err_manager:
  *************************************************************************/
 
 int
-sosc_supervisor_run(char *progname)
+main(int argc, char **argv)
 {
+	uv_setup_args(argc, argv);
+
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+
 	if (init_events())
 		goto err_ev_init;
 

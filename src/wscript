@@ -1,121 +1,35 @@
 #!/usr/bin/env python
 
-import subprocess
-import re
+top = '..'
 
-top = ".."
-
-non_decimal = re.compile(r"[^\d.]+")
-
-def strip_non_numeric(s):
-	return non_decimal.sub("", s)
-
-def win_version_string(version):
-	"""FILEVERSION and PRODUCTVERSION in .rc files look like:
-
-		FILEVERSION    1,0,0,0
-		PRODUCTVERSION 1,0,0,0
-
-	this function turns a normal version string (like "1.1") into
-	a windowsy one."""
-
-	v = strip_non_numeric(version).split(".")
-	pad = ["0" for x in range(4 - len(v))]
-
-	v.extend(pad)
-	return ",".join(v[:4])
-
-def build(bld):
-	# ".." for config-autogen.h
-	bld(export_includes=".. ../include ../third-party", name="sosc_inc")
-
+def build_common(ctx):
 	objs = []
 	obj = lambda src: objs.append(src)
 
-	#
-	# platform
-	#
-
-	if bld.env.DEST_OS[:3] == "win":
-		bld(
-			source="common/platform/winres/serialosc.rc.in",
-			target="serialosc.rc",
-			features="subst",
-
-			install_path=None,
-
-			GIT_COMMIT=bld.env.GIT_COMMIT,
-			WIN_VERSION=win_version_string(bld.env.VERSION),
-			VERSION=bld.env.VERSION)
-
-		bld(
-			features="winrc includes",
-			source="serialosc.rc",
-			target="serialosc.rc.o",
-	
-			includes="common/platform/winres")
-
-		obj("serialosc.rc.o")
-	
-		obj("common/platform/windows.c")
-		obj("detector/windows.c")
-		obj("supervisor/windows.c")
-		obj("event_loop/windows.c")
-
-		if not bld.env.SOSC_NO_ZEROCONF:
-			obj("zeroconf/windows.c")
-
+	if ctx.env.DEST_OS[:3] == "win":
+		obj('common/platform/windows.c')
 	else:
-		obj("common/platform/posix.c")
-		obj("supervisor/uv.c")
+		obj('common/platform/posix.c')
 
-		if bld.env.DEST_OS == "linux":
-			obj("common/platform/linux.c")
-			obj("detector/libudev.c")
+		if ctx.env.DEST_OS == 'linux':
+			obj('common/platform/linux.c')
+		elif ctx.env.DEST_OS == 'darwin':
+			obj('common/platform/darwin.c')
 
-			if not bld.env.SOSC_NO_ZEROCONF:
-				obj("zeroconf/not_darwin.c")
+	obj('common/ipc.c')
+	obj('common/util.c')
 
-		elif bld.env.DEST_OS == "darwin":
-			obj("common/platform/darwin.c")
-			obj("detector/iokitlib.c")
+	ctx.stlib(
+		source=objs,
+		target='serialosc-common',
+		use='serialosc-include')
 
-			if not bld.env.SOSC_NO_ZEROCONF:
-				obj("zeroconf/darwin.c")
+def build(ctx):
+	ctx(export_includes=['..', '../include', '../third-party'],
+			name='serialosc-include')
 
-		obj("event_loop/uv.c")
+	build_common(ctx)
 
-	#
-	# common
-	#
-
-	if bld.env.SOSC_NO_ZEROCONF:
-		obj("zeroconf/dummy.c")
-	else:
-		obj("zeroconf/common.c")
-
-	obj("osc/mext_methods.c")
-	obj("osc/sys_methods.c")
-	obj("osc/util.c")
-
-	obj("common/ipc.c")
-	obj("common/util.c")
-	obj("server.c")
-	obj("config.c")
-
-	obj("serialosc.c")
-
-	if bld.env.DEST_OS == "darwin":
-		bld.program(
-			source=objs,
-			target="serialoscd",
-
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME LIBUV",
-			framework=["IOKit", "CoreFoundation"])
-
-	else:
-		bld.program(
-			source=objs,
-			target="serialoscd",
-
-			use="sosc_inc LO UDEV CONFUSE LIBMONOME DNSSD_INC DL LIBUV")
+	ctx.recurse('serialoscd')
+	ctx.recurse('serialosc-detector')
+	ctx.recurse('serialosc-device')
