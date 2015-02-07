@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <stdio.h>
 
 #include <uv.h>
@@ -63,6 +64,9 @@ struct sosc_supervisor {
 	uv_loop_t *loop;
 	sosc_supervisor_state_t state;
 
+	char *detector_exe_path;
+	char *device_exe_path;
+
 	struct sosc_subprocess detector;
 
 	struct {
@@ -94,21 +98,10 @@ struct sosc_device_subprocess {
 
 static int
 launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
-		uv_exit_cb exit_cb, char *arg)
+		char *exe_path, uv_exit_cb exit_cb, char *arg)
 {
 	struct uv_process_options_s options;
-	char path_buf[1024];
 	int pipefds[2][2], err;
-	size_t len;
-
-	len = sizeof(path_buf);
-	err = uv_exepath(path_buf, &len);
-	if (err < 0) {
-		fprintf(stderr, "launch_subprocess() failed in uv_exepath(): %s\n",
-				uv_strerror(err));
-
-		goto err_exepath;
-	}
 
 	err = pipe(pipefds[0]);
 	if (err < 0) {
@@ -125,8 +118,8 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 	options = (struct uv_process_options_s) {
 		.exit_cb = exit_cb,
 
-		.file    = path_buf,
-		.args    = (char *[]) {path_buf, arg, NULL},
+		.file    = exe_path,
+		.args    = (char *[]) {exe_path, arg, NULL},
 		.flags   = UV_PROCESS_WINDOWS_HIDE,
 
 		.stdio_count = 2,
@@ -165,7 +158,6 @@ err_pipe1:
 	close(pipefds[0][0]);
 	close(pipefds[0][1]);
 err_pipe0:
-err_exepath:
 	return err;
 }
 
@@ -242,7 +234,8 @@ supervisor__change_state(struct sosc_supervisor *self,
 
 	switch (new_state) {
 	case SERIALOSC_ENABLED:
-		if (launch_subprocess(self, &self->detector, detector_exit_cb, "-d"))
+		if (launch_subprocess(self, &self->detector, self->detector_exe_path,
+					detector_exit_cb, "-d"))
 			return -1;
 
 		self->detector.proc.data = &detector_type;
@@ -483,7 +476,8 @@ static int
 device_init(struct sosc_supervisor *self, struct sosc_device_subprocess *dev,
 		char *devnode)
 {
-	if (launch_subprocess(self, &dev->subprocess, device_exit_cb, devnode))
+	if (launch_subprocess(self, &dev->subprocess, self->device_exe_path,
+				device_exit_cb, devnode))
 		return -1;
 
 	dev->supervisor = self;
@@ -660,6 +654,46 @@ detector_pipe_cb(uv_poll_t *handle, int status, int events)
  * entry point
  *************************************************************************/
 
+static int
+cache_paths(struct sosc_supervisor *self)
+{
+	char path_buf[1024], *exe_dir;
+	size_t len;
+	int err;
+
+	len = sizeof(path_buf);
+	err = uv_exepath(path_buf, &len);
+	if (err < 0) {
+		fprintf(stderr, "cache_paths() failed in uv_exepath(): %s\n",
+				uv_strerror(err));
+
+		goto err_exepath;
+	}
+
+	exe_dir = dirname(path_buf);
+
+	self->detector_exe_path = s_asprintf("%s/serialosc-detector", exe_dir);
+	self->device_exe_path   = s_asprintf("%s/serialosc-device", exe_dir);
+
+	if (!self->detector_exe_path || !self->device_exe_path)
+		goto err_asprintf;
+
+	return 0;
+
+err_asprintf:
+	s_free(self->detector_exe_path);
+	s_free(self->device_exe_path);
+err_exepath:
+	return 1;
+}
+
+static void
+free_paths(struct sosc_supervisor *self)
+{
+	s_free(self->detector_exe_path);
+	s_free(self->device_exe_path);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -671,6 +705,9 @@ main(int argc, char **argv)
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	sosc_config_create_directory();
+
+	if (cache_paths(&self))
+		goto err_cache_paths;
 
 	self.loop  = uv_default_loop();
 	VECTOR_INIT(&self.notifications, 32);
@@ -698,11 +735,14 @@ main(int argc, char **argv)
 	VECTOR_FREE(&self.notifications);
 	uv_loop_close(self.loop);
 
+	free_paths(&self);
+
 	return 0;
 
 err_enable:
 	lo_server_free(self.osc.server);
 err_osc_server:
 	uv_loop_close(self.loop);
+err_cache_paths:
 	return -1;
 }
