@@ -44,7 +44,7 @@ monome_poll_cb(uv_poll_t *handle, int status, int events)
 static void
 osc_poll_cb(uv_poll_t *handle, int status, int events)
 {
-	SELF_FROM(handle, monome_poll);
+	SELF_FROM(handle, osc_poll);
 	lo_server_recv_noblock(self->state->server, 0);
 }
 
