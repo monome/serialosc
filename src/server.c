@@ -219,7 +219,9 @@ sosc_server_run(monome_t *monome)
 	char *svc_name;
 	sosc_state_t state = {
 		.monome = monome,
-		.ipc_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
+
+		.ipc_in_fd  = (!isatty(STDIN_FILENO))  ? STDIN_FILENO  : -1,
+		.ipc_out_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
 	};
 
 	if (sosc_config_read(monome_get_serial(state.monome), &state.config)) {
@@ -266,15 +268,15 @@ sosc_server_run(monome_t *monome)
 	osc_register_sys_methods(&state);
 	osc_register_methods(&state);
 
-	if (state.ipc_fd < 0) {
+	if (state.ipc_out_fd < 0) {
 		fprintf(
 			stderr, "serialosc [%s]: connected, server running on port %d\n",
 			monome_get_serial(state.monome), lo_server_get_port(state.server));
 	} else {
-		send_device_info(state.ipc_fd, monome);
+		send_device_info(state.ipc_out_fd, monome);
 		send_osc_port_change(
-			state.ipc_fd, lo_server_get_port(state.server));
-		send_simple_ipc(state.ipc_fd, SOSC_DEVICE_READY);
+			state.ipc_out_fd, lo_server_get_port(state.server));
+		send_simple_ipc(state.ipc_out_fd, SOSC_DEVICE_READY);
 	}
 
 	sosc_zeroconf_register(&state, svc_name);
@@ -286,11 +288,11 @@ sosc_server_run(monome_t *monome)
 
 	sosc_zeroconf_unregister(&state);
 
-	if (state.ipc_fd < 0) {
+	if (state.ipc_out_fd < 0) {
 		fprintf(stderr, "serialosc [%s]: disconnected, exiting\n",
 				monome_get_serial(state.monome));
 	} else
-		send_simple_ipc(state.ipc_fd, SOSC_DEVICE_DISCONNECTION);
+		send_simple_ipc(state.ipc_out_fd, SOSC_DEVICE_DISCONNECTION);
 
 	if (sosc_config_write(monome_get_serial(state.monome), &state)) {
 		fprintf(

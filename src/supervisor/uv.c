@@ -49,7 +49,8 @@ typedef enum {
 
 struct sosc_subprocess {
 	uv_process_t proc;
-	int pipe_fd;
+	int incoming_pipe_fd;
+	int outgoing_pipe_fd;
 	uv_poll_t poll;
 };
 
@@ -98,7 +99,7 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 {
 	struct uv_process_options_s options;
 	char path_buf[1024];
-	int pipefds[2], err;
+	int pipefds[2][2], err;
 	size_t len;
 
 	len = sizeof(path_buf);
@@ -110,10 +111,16 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		goto err_exepath;
 	}
 
-	err = pipe(pipefds);
+	err = pipe(pipefds[0]);
 	if (err < 0) {
 		perror("launch_subprocess() failed in pipe()");
-		goto err_pipe;
+		goto err_pipe0;
+	}
+
+	err = pipe(pipefds[1]);
+	if (err < 0) {
+		perror("launch_subprocess() failed in pipe()");
+		goto err_pipe1;
 	}
 
 	options = (struct uv_process_options_s) {
@@ -126,18 +133,20 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		.stdio_count = 2,
 		.stdio = (struct uv_stdio_container_s []) {
 			[STDIN_FILENO] = {
-				.flags = UV_IGNORE
+				.flags   = UV_INHERIT_FD,
+				.data.fd = pipefds[0][0]
 			},
 
 			[STDOUT_FILENO] = {
-				.flags = UV_INHERIT_FD,
-				.data.fd = pipefds[1]
+				.flags   = UV_INHERIT_FD,
+				.data.fd = pipefds[1][1]
 			}
 		},
 	};
 
 	err = uv_spawn(self->loop, &proc->proc, &options);
-	close(pipefds[1]);
+	close(pipefds[0][0]);
+	close(pipefds[1][1]);
 
 	if (err < 0) {
 		fprintf(stderr, "launch_subprocess() failed in uv_spawn(): %s\n",
@@ -145,13 +154,18 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		goto err_spawn;
 	}
 
-	proc->pipe_fd = pipefds[0];
-	uv_poll_init(self->loop, &proc->poll, proc->pipe_fd);
+	proc->outgoing_pipe_fd = pipefds[0][1];
+	proc->incoming_pipe_fd = pipefds[1][0];
+	uv_poll_init(self->loop, &proc->poll, proc->incoming_pipe_fd);
 	return 0;
 
 err_spawn:
-	close(pipefds[0]);
-err_pipe:
+	close(pipefds[1][0]);
+	close(pipefds[1][1]);
+err_pipe1:
+	close(pipefds[0][0]);
+	close(pipefds[0][1]);
+err_pipe0:
 err_exepath:
 	return err;
 }
@@ -484,7 +498,9 @@ device_poll_close_cb(uv_handle_t *handle)
 {
 	DEV_FROM(handle, subprocess.poll);
 
-	close(dev->subprocess.pipe_fd);
+	close(dev->subprocess.incoming_pipe_fd);
+	close(dev->subprocess.outgoing_pipe_fd);
+
 	uv_close((void *) &dev->subprocess.proc, device_proc_close_cb);
 }
 
@@ -545,7 +561,7 @@ device_pipe_cb(uv_poll_t *handle, int status, int events)
 	DEV_FROM(handle, subprocess.poll);
 	struct sosc_ipc_msg msg;
 
-	if (sosc_ipc_msg_read(dev->subprocess.pipe_fd, &msg) > 0)
+	if (sosc_ipc_msg_read(dev->subprocess.incoming_pipe_fd, &msg) > 0)
 		handle_device_msg(dev->supervisor, dev, &msg);
 }
 
@@ -578,9 +594,13 @@ err_calloc:
 static int
 handle_detector_msg(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
 {
+	int ret;
+
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
-		return handle_connection(self, msg);
+		ret = handle_connection(self, msg);
+		s_free(msg->connection.devnode);
+		return ret;
 
 	case SOSC_OSC_PORT_CHANGE:
 	case SOSC_DEVICE_INFO:
@@ -596,7 +616,8 @@ static void
 detector_poll_close_cb(uv_handle_t *handle)
 {
 	SELF_FROM(handle, detector.poll);
-	close(self->detector.pipe_fd);
+	close(self->detector.incoming_pipe_fd);
+	close(self->detector.outgoing_pipe_fd);
 
 	uv_close((void *) &self->detector.proc, NULL);
 }
@@ -615,7 +636,7 @@ detector_pipe_cb(uv_poll_t *handle, int status, int events)
 	SELF_FROM(handle, detector.poll);
 	struct sosc_ipc_msg msg;
 
-	if (sosc_ipc_msg_read(self->detector.pipe_fd, &msg) > 0)
+	if (sosc_ipc_msg_read(self->detector.incoming_pipe_fd, &msg) > 0)
 		handle_detector_msg(self, &msg);
 }
 

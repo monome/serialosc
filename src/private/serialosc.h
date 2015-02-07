@@ -55,7 +55,9 @@ typedef struct sosc_state {
 	monome_t *monome;
 	lo_address *outgoing;
 	lo_server *server;
-	int ipc_fd;
+
+	int ipc_in_fd;
+	int ipc_out_fd;
 
 #ifndef SOSC_NO_ZEROCONF
 	DNSServiceRef ref;
