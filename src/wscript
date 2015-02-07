@@ -38,7 +38,7 @@ def build(bld):
 
 	if bld.env.DEST_OS[:3] == "win":
 		bld(
-			source="platform/winres/serialosc.rc.in",
+			source="common/platform/winres/serialosc.rc.in",
 			target="serialosc.rc",
 			features="subst",
 
@@ -53,11 +53,11 @@ def build(bld):
 			source="serialosc.rc",
 			target="serialosc.rc.o",
 	
-			includes="platform/winres")
+			includes="common/platform/winres")
 
 		obj("serialosc.rc.o")
 	
-		obj("platform/windows.c")
+		obj("common/platform/windows.c")
 		obj("detector/windows.c")
 		obj("supervisor/windows.c")
 		obj("event_loop/windows.c")
@@ -66,18 +66,18 @@ def build(bld):
 			obj("zeroconf/windows.c")
 
 	else:
-		obj("platform/posix.c")
+		obj("common/platform/posix.c")
 		obj("supervisor/uv.c")
 
 		if bld.env.DEST_OS == "linux":
-			obj("platform/linux.c")
+			obj("common/platform/linux.c")
 			obj("detector/libudev.c")
 
 			if not bld.env.SOSC_NO_ZEROCONF:
 				obj("zeroconf/not_darwin.c")
 
 		elif bld.env.DEST_OS == "darwin":
-			obj("platform/darwin.c")
+			obj("common/platform/darwin.c")
 			obj("detector/iokitlib.c")
 
 			if not bld.env.SOSC_NO_ZEROCONF:
@@ -98,8 +98,8 @@ def build(bld):
 	obj("osc/sys_methods.c")
 	obj("osc/util.c")
 
-	obj("ipc.c")
-	obj("util.c")
+	obj("common/ipc.c")
+	obj("common/util.c")
 	obj("server.c")
 	obj("config.c")
 
