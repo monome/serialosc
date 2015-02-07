@@ -18,13 +18,14 @@
 #include <uv.h>
 
 #include "serialosc.h"
+#include "ipc.h"
 
 #define SELF_FROM(p, member) struct sosc_uv_poll *self = container_of(p,	\
 		struct sosc_uv_poll, member)
 
 struct sosc_uv_poll {
 	uv_loop_t *loop;
-	uv_poll_t monome_poll, osc_poll;
+	uv_poll_t monome_poll, osc_poll, supervisor_pipe_poll;
 	const struct sosc_state *state;
 };
 
@@ -48,6 +49,29 @@ osc_poll_cb(uv_poll_t *handle, int status, int events)
 	lo_server_recv_noblock(self->state->server, 0);
 }
 
+static int
+handle_supervisor_message(struct sosc_uv_poll *self, struct sosc_ipc_msg *msg)
+{
+	switch (msg->type) {
+	case SOSC_PROCESS_SHOULD_EXIT:
+		uv_stop(self->loop);
+		return 0;
+
+	default:
+		return -1;
+	}
+}
+
+static void
+supervisor_pipe_poll_cb(uv_poll_t *handle, int status, int events)
+{
+	SELF_FROM(handle, supervisor_pipe_poll);
+	struct sosc_ipc_msg msg;
+
+	if (sosc_ipc_msg_read(self->state->ipc_in_fd, &msg) > 0)
+		handle_supervisor_message(self, &msg);
+}
+
 int
 sosc_event_loop(const struct sosc_state *state)
 {
@@ -63,7 +87,16 @@ sosc_event_loop(const struct sosc_state *state)
 	uv_poll_start(&self.monome_poll, UV_READABLE, monome_poll_cb);
 	uv_poll_start(&self.osc_poll, UV_READABLE, osc_poll_cb);
 
+	if (state->ipc_in_fd > -1) {
+		uv_poll_init(self.loop, &self.supervisor_pipe_poll, state->ipc_in_fd);
+		uv_poll_start(&self.supervisor_pipe_poll, UV_READABLE,
+				supervisor_pipe_poll_cb);
+	}
+
 	uv_run(self.loop, UV_RUN_DEFAULT);
+
+	if (state->ipc_in_fd > -1)
+		uv_close((void *) &self.supervisor_pipe_poll, NULL);
 
 	uv_close((void *) &self.osc_poll, NULL);
 	uv_close((void *) &self.monome_poll, NULL);

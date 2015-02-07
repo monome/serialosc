@@ -221,10 +221,16 @@ done:
 static void
 kill_devices_walk_cb(uv_handle_t *handle, void *_args)
 {
+	struct sosc_device_subprocess *dev;
+	struct sosc_ipc_msg msg = {
+		.type = SOSC_PROCESS_SHOULD_EXIT
+	};
+
 	if (handle->data != &device_type)
 		return;
 
-	uv_process_kill((void *) handle, SIGTERM);
+	dev = container_of(handle, struct sosc_device_subprocess, subprocess.proc);
+	sosc_ipc_msg_write(dev->subprocess.outgoing_pipe_fd, &msg);
 }
 
 static int
@@ -529,6 +535,7 @@ handle_device_msg(struct sosc_supervisor *self,
 {
 	switch (msg->type) {
 	case SOSC_DEVICE_CONNECTION:
+	case SOSC_PROCESS_SHOULD_EXIT:
 		return -1;
 
 	case SOSC_OSC_PORT_CHANGE:
@@ -606,6 +613,7 @@ handle_detector_msg(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
 	case SOSC_DEVICE_INFO:
 	case SOSC_DEVICE_READY:
 	case SOSC_DEVICE_DISCONNECTION:
+	case SOSC_PROCESS_SHOULD_EXIT:
 		return -1;
 	}
 

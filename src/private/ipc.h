@@ -26,11 +26,15 @@
 #endif
 
 typedef enum {
+	/* device -> supervisor */
 	SOSC_DEVICE_CONNECTION,
 	SOSC_DEVICE_INFO,
 	SOSC_DEVICE_READY,
 	SOSC_DEVICE_DISCONNECTION,
-	SOSC_OSC_PORT_CHANGE
+	SOSC_OSC_PORT_CHANGE,
+
+	/* supervisor -> device */
+	SOSC_PROCESS_SHOULD_EXIT
 } sosc_ipc_type_t;
 
 typedef struct sosc_ipc_msg {
