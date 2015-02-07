@@ -13,7 +13,7 @@ BEGIN
 			VALUE "FileVersion", "@VERSION@"
 			VALUE "InternalName", "serialosc"
 			VALUE "LegalCopyright", "William Light <wrl@illest.net>"
-			VALUE "OriginalFilename", "serialoscd.exe"
+			VALUE "OriginalFilename", "@EXECUTABLE@"
 			VALUE "ProductName", "serialosc"
 			VALUE "ProductVersion", "@GIT_COMMIT@"
 		END

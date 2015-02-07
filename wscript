@@ -89,6 +89,7 @@ def load_tools(ctx):
 	load_tool = lambda t: ctx.load(t, tooldir=tooldir)
 
 	load_tool('gyp_wrapper')
+	load_tool('winres_gen')
 
 #
 # waf stuff
@@ -165,11 +166,13 @@ def configure(conf):
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
 	conf.env.VERSION = VERSION
+	conf.env.GIT_COMMIT = subprocess.check_output(
+			["git", "rev-parse", "--verify", "--short", "HEAD"]
+		).decode().strip()
+
 	conf.define("VERSION", VERSION)
 	conf.define("_GNU_SOURCE", 1)
-	conf.define("GIT_COMMIT",
-		subprocess.check_output(["git", "rev-parse", "--verify", "--short", "HEAD"])
-			.decode().strip())
+	conf.define("GIT_COMMIT", conf.env.GIT_COMMIT)
 
 	conf.write_config_header("config-autogen.h", remove=False)
 
