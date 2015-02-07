@@ -78,7 +78,6 @@ struct sosc_supervisor {
 	VECTOR(sosc_notifications, struct sosc_notification_endpoint)
 		notifications;
 
-	int notifications_were_sent;
 	uv_check_t drain_notifications;
 };
 
@@ -425,6 +424,15 @@ init_osc_server(struct sosc_supervisor *self)
 	return 0;
 }
 
+static void
+drain_notifications_cb(uv_check_t *handle)
+{
+	SELF_FROM(handle, drain_notifications);
+
+	VECTOR_CLEAR(&self->notifications);
+	uv_check_stop(handle);
+}
+
 static int
 osc_notify(struct sosc_supervisor *self, struct sosc_device_subprocess *dev,
 		sosc_ipc_type_t type)
@@ -461,7 +469,7 @@ osc_notify(struct sosc_supervisor *self, struct sosc_device_subprocess *dev,
 		lo_address_free(dst);
 	}
 
-	self->notifications_were_sent = 1;
+	uv_check_start(&self->drain_notifications, drain_notifications_cb);
 	return 0;
 }
 
@@ -652,17 +660,6 @@ detector_pipe_cb(uv_poll_t *handle, int status, int events)
  * entry point
  *************************************************************************/
 
-static void
-drain_notifications_cb(uv_check_t *handle)
-{
-	SELF_FROM(handle, drain_notifications);
-
-	if (self->notifications_were_sent) {
-		VECTOR_CLEAR(&self->notifications);
-		self->notifications_were_sent = 0;
-	}
-}
-
 int
 sosc_supervisor_run(char *progname)
 {
@@ -685,12 +682,15 @@ sosc_supervisor_run(char *progname)
 	uv_set_process_title("serialosc [supervisor]");
 
 	uv_poll_start(&self.osc.poll, UV_READABLE, osc_poll_cb);
-
-	self.notifications_were_sent = 0;
 	uv_check_init(self.loop, &self.drain_notifications);
-	uv_check_start(&self.drain_notifications, drain_notifications_cb);
 
 	uv_run(self.loop, UV_RUN_DEFAULT);
+
+	uv_close((void *) &self.drain_notifications, NULL);
+	uv_close((void *) &self.state_change.check, NULL);
+
+	/* run once more to make sure libuv cleans up any internal resources. */
+	uv_run(self.loop, UV_RUN_NOWAIT);
 
 	VECTOR_FREE(&self.notifications);
 	uv_loop_close(self.loop);
