@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "serialosc.h"
+#include <serialosc/serialosc.h>
 
 char *
 s_asprintf(const char *fmt, ...)

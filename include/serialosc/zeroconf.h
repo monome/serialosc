@@ -14,9 +14,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <dns_sd.h>
+#pragma once
 
-#include "serialosc.h"
+#include <dns_sd.h>
+#include <serialosc/serialosc.h>
 
 typedef DNSServiceErrorType (DNSSD_API *dnssd_registration_func_t)
 (

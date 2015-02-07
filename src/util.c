@@ -15,7 +15,8 @@
  */
 
 #include <stdio.h>
-#include "serialosc.h"
+
+#include <serialosc/serialosc.h>
 
 /* convert a port int to either a zero-length string if 0 or
    a maximum 5 length string. */

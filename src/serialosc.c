@@ -23,7 +23,7 @@
 #include <uv.h>
 #include <monome.h>
 
-#include "serialosc.h"
+#include <serialosc/serialosc.h>
 
 static void
 print_version(void)

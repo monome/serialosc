@@ -20,8 +20,8 @@
 #include <lo/lo.h>
 #include <monome.h>
 
-#include "serialosc.h"
-#include "osc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/osc.h>
 
 static int
 coerce_arg_to_int(lo_type type, lo_arg *src)

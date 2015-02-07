@@ -19,8 +19,8 @@
 #include <Windows.h>
 #include <dns_sd.h>
 
-#include "serialosc.h"
-#include "zeroconf.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/zeroconf.h>
 
 void
 sosc_zeroconf_init(void)

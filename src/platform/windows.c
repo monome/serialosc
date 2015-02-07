@@ -28,7 +28,7 @@
 
 #include <direct.h>
 
-#include "platform.h"
+#include <serialosc/platform.h>
 
 static int
 mk_monome_dir(char *cdir)

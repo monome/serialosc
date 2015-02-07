@@ -29,9 +29,9 @@
 #include <lo/lo.h>
 #include <monome.h>
 
-#include "serialosc.h"
-#include "osc.h"
-#include "ipc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/osc.h>
+#include <serialosc/ipc.h>
 
 
 #define DEFAULT_OSC_PREFIX      "/monome"

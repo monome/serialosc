@@ -27,8 +27,8 @@
 #include <libudev.h>
 #include <monome.h>
 
-#include "serialosc.h"
-#include "ipc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
 
 
 typedef struct {

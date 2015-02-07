@@ -17,8 +17,8 @@
 #include <dlfcn.h>
 #include <stdio.h>
 
-#include "serialosc.h"
-#include "zeroconf.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/zeroconf.h>
 
 union reg_func {
 	dnssd_registration_func_t fptr;

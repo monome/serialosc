@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <uv.h>
 
-#include "serialosc.h"
-#include "ipc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
 
 #define SELF_FROM(p, member) struct sosc_uv_poll *self = container_of(p,	\
 		struct sosc_uv_poll, member)

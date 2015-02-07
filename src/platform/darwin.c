@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
-#include "platform.h"
+#include <serialosc/platform.h>
 
 char *
 sosc_get_config_directory(void)

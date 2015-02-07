@@ -14,6 +14,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#pragma once
+
 char *sosc_get_config_directory(void);
 
 char *s_asprintf(const char *fmt, ...);

@@ -27,7 +27,7 @@ def win_version_string(version):
 
 def build(bld):
 	# ".." for config-autogen.h
-	bld(export_includes=".. private ../third-party", name="sosc_inc")
+	bld(export_includes=".. ../include ../third-party", name="sosc_inc")
 
 	objs = []
 	obj = lambda src: objs.append(src)

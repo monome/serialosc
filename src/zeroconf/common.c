@@ -17,8 +17,8 @@
 #include <stdio.h>
 #include <dns_sd.h>
 
-#include "serialosc.h"
-#include "zeroconf.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/zeroconf.h>
 
 dnssd_registration_func_t sosc_dnssd_registration_func = NULL;
 dnssd_deallocation_func_t sosc_dnssd_deallocation_func = NULL;

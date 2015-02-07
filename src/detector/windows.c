@@ -27,8 +27,8 @@
 #include <Dbt.h>
 #include <io.h>
 
-#include "serialosc.h"
-#include "ipc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
 
 #define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
 

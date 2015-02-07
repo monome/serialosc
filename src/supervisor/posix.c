@@ -26,9 +26,9 @@
 
 #include <monome.h>
 
-#include "serialosc.h"
-#include "ipc.h"
-#include "osc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
+#include <serialosc/osc.h>
 
 #define ARRAY_LENGTH(x) (sizeof(x) / sizeof(*x))
 #define MAX_DEVICES 32

@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
-#include "osc.h"
+#include <serialosc/osc.h>
 
 char *
 osc_path(const char *path, const char *prefix)

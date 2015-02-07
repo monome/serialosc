@@ -24,9 +24,9 @@
 #include <Dbt.h>
 #include <io.h>
 
-#include "serialosc.h"
-#include "ipc.h"
-#include "osc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
+#include <serialosc/osc.h>
 
 /* damnit mingw */
 #ifndef JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE

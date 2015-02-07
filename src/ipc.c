@@ -20,8 +20,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "serialosc.h"
-#include "ipc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
 
 #define IPC_MAGIC 0x505C /* SOSC, get it? */
 

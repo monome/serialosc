@@ -14,7 +14,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "serialosc.h"
+#pragma once
+
+#include <serialosc/serialosc.h>
 
 /* typing the whole signature out everywhere sucks a lot */
 #define OSC_HANDLER_FUNC(x)\

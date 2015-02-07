@@ -16,7 +16,7 @@
 
 #include <stdio.h>
 
-#include "serialosc.h"
+#include <serialosc/serialosc.h>
 
 void
 sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)

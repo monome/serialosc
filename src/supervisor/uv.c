@@ -21,9 +21,9 @@
 #include <uv.h>
 #include <wwrl/vector_stdlib.h>
 
-#include "serialosc.h"
-#include "ipc.h"
-#include "osc.h"
+#include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
+#include <serialosc/osc.h>
 
 #define SELF_FROM(p, member) struct sosc_supervisor *self = container_of(p,	\
 		struct sosc_supervisor, member)

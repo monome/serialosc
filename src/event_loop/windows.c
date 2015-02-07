@@ -20,7 +20,7 @@
 #include <Winsock.h>
 #include <io.h>
 
-#include "serialosc.h"
+#include <serialosc/serialosc.h>
 
 static DWORD WINAPI
 lo_thread(LPVOID param)

@@ -24,7 +24,7 @@
 #include <monome.h>
 #include <lo/lo.h>
 
-#include "serialosc.h"
+#include <serialosc/serialosc.h>
 
 
 #define DEFAULT_SERVER_PORT  0
