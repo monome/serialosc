@@ -81,7 +81,7 @@ sosc_event_loop(const struct sosc_state *state)
 	self.loop = uv_default_loop();
 
 	uv_poll_init(self.loop, &self.monome_poll, monome_get_fd(state->monome));
-	uv_poll_init(self.loop, &self.osc_poll,
+	uv_poll_init_socket(self.loop, &self.osc_poll,
 			lo_server_get_socket_fd(state->server));
 
 	uv_poll_start(&self.monome_poll, UV_READABLE, monome_poll_cb);

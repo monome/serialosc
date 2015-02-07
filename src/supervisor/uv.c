@@ -418,7 +418,7 @@ init_osc_server(struct sosc_supervisor *self)
 	lo_server_add_method(self->osc.server,
 			"/serialosc/version", "si", osc_report_version, self);
 
-	uv_poll_init(self->loop, &self->osc.poll,
+	uv_poll_init_socket(self->loop, &self->osc.poll,
 			lo_server_get_socket_fd(self->osc.server));
 
 	return 0;
