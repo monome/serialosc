@@ -16,14 +16,11 @@
 
 #include <stdio.h>
 
-#include <uv.h>
-
-#define WINVER 0x501
-
+#include <winsock2.h>
 #include <windows.h>
 #include <process.h>
-#include <Winreg.h>
-#include <Dbt.h>
+#include <winreg.h>
+#include <dbt.h>
 #include <io.h>
 
 #include <serialosc/serialosc.h>
@@ -448,6 +445,9 @@ handle_msg(struct incoming_pipe *p, sosc_ipc_msg_t *msg)
 	case SOSC_OSC_PORT_CHANGE:
 		p->info.port = msg->port_change.port;
 		break;
+
+	case SOSC_PROCESS_SHOULD_EXIT:
+		return -1;
 	}
 
 	return 0;
@@ -529,7 +529,7 @@ queue_read:
 			break;
 
 		default:
-			fprintf(stderr, "supervisor: handle_pipe(): error %ld\n", res);
+			fprintf(stderr, "supervisor: handle_pipe(): error %d\n", res);
 			return -1;
 		}
 	}
@@ -767,8 +767,6 @@ err_manager:
 int
 main(int argc, char **argv)
 {
-	uv_setup_args(argc, argv);
-
 	setvbuf(stdout, NULL, _IONBF, 0);
 	setvbuf(stderr, NULL, _IONBF, 0);
 

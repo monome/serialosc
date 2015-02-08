@@ -18,13 +18,11 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-/* for RegisterDeviceNotification */
-#define WINVER 0x501
-
+#include <winsock2.h>
 #include <windows.h>
 #include <process.h>
-#include <Winreg.h>
-#include <Dbt.h>
+#include <winreg.h>
+#include <dbt.h>
 #include <io.h>
 
 #include <serialosc/serialosc.h>
@@ -292,13 +290,6 @@ open_pipe_to_supervisor(void)
 	return 0;
 }
 
-static DWORD WINAPI
-supervisor_thread(LPVOID param)
-{
-	sosc_supervisor_run(NULL);
-	return 0;
-}
-
 static void WINAPI
 service_main(DWORD argc, LPTSTR *argv)
 {
@@ -311,15 +302,13 @@ service_main(DWORD argc, LPTSTR *argv)
 	state.svc_status.dwCurrentState = SERVICE_RUNNING;
 	SetServiceStatus(state.hstatus, &state.svc_status);
 
-	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
-
 	if (open_pipe_to_supervisor())
 		goto err_supervisor_pipe;
 
 	if (setup_device_notification())
 		goto err_rdnotification;
 
-	scan_connected_devices(&state);
+	scan_connected_devices();
 	return;
 
 err_rdnotification:
@@ -335,7 +324,6 @@ static void
 debug_main(void)
 {
 	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
-	CreateThread(NULL, 0, supervisor_thread, NULL, 0, NULL);
 
 	open_pipe_to_supervisor();
 	scan_connected_devices();

@@ -66,9 +66,7 @@ typedef struct sosc_state {
 } sosc_state_t;
 
 int  sosc_event_loop(const sosc_state_t *state);
-int  sosc_detector_run(const char *exec);
 void sosc_server_run(monome_t *monome);
-int  sosc_supervisor_run(char *progname);
 
 int sosc_config_create_directory();
 int sosc_config_read(const char *serial, sosc_config_t *config);

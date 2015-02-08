@@ -16,7 +16,9 @@
 
 #include <stdio.h>
 
-#include <Windows.h>
+#include <winsock2.h>
+#include <windows.h>
+
 #include <dns_sd.h>
 
 #include <serialosc/serialosc.h>

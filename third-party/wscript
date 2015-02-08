@@ -15,6 +15,7 @@ def build_uv(ctx):
 		extra_cflags += [
 			'-std=gnu89',
 
+			'-Wno-attributes',
 			'-Wno-sign-compare',
 			'-Wno-unused-function',
 			'-Wno-pointer-sign',
