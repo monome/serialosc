@@ -22,8 +22,6 @@ def check_udev(conf):
 		mandatory=False,
 		quote=0,
 
-		execute=True,
-
 		lib="udev",
 		uselib_store="UDEV",
 
@@ -36,8 +34,6 @@ def check_liblo(conf):
 		mandatory=True,
 		quote=0,
 
-		execute=True,
-
 		lib="lo",
 		uselib_store="LO",
 
@@ -49,8 +45,6 @@ def check_confuse(conf):
 		mandatory=True,
 		quote=0,
 
-		execute=True,
-
 		lib="confuse",
 		uselib_store="CONFUSE",
 
@@ -61,8 +55,6 @@ def check_libmonome(conf):
 		define_name="HAVE_LIBMONOME",
 		mandatory=True,
 		quote=0,
-
-		execute=True,
 
 		lib="monome",
 		header_name="monome.h",
@@ -91,6 +83,21 @@ def load_tools(ctx):
 	load_tool('gyp_wrapper')
 	load_tool('winres_gen')
 
+def override_find_program(prefix):
+	from waflib.Configure import find_program as orig_find
+	from waflib.Configure import conf
+
+	if prefix[-1] != '-':
+		prefix += '-'
+
+	@conf
+	def find_program(self, filename, **kw):
+		if type(filename) == str:
+			return orig_find(self, prefix + filename, **kw)
+		else:
+			return orig_find(self, [prefix + x for x in filename], **kw)
+		return orig_find(self, filename, **kw)
+
 #
 # waf stuff
 #
@@ -110,6 +117,10 @@ def configure(conf):
 	# print() (as a function) ddoesn't work on python <2.7
 	separator = lambda: sys.stdout.write("\n")
 
+	xcomp_prefix = conf.environ.get('CROSS_COMPILE', None)
+	if xcomp_prefix:
+		override_find_program(xcomp_prefix)
+
 	separator()
 	conf.load("compiler_c")
 	conf.load("gnu_dirs")
@@ -117,8 +128,13 @@ def configure(conf):
 
 	if conf.env.DEST_OS == "win32":
 		conf.load("winres")
+
 		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
 		conf.env.append_unique("CFLAGS", conf.env.CPPPATH_ST % conf.env.INCLUDEDIR)
+
+		conf.env.append_unique("LIBPATH", conf.env.PREFIX + '/lib')
+		conf.env.append_unique("CFLAGS",
+				conf.env.CPPPATH_ST % conf.env.PREFIX + 'include')
 
 	#
 	# conf checks
