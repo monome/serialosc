@@ -30,6 +30,7 @@ def build_uv(ctx):
 	elif ctx.env.DEST_OS == 'darwin':
 		# some bullshit about converting between void pointer and function pointer
 		from_gyp['cflags'].remove('-pedantic')
+		from_gyp['ldflags'].remove('-pthread')
 
 	ctx.env.append_unique('LINKFLAGS_UV_FLAGS', from_gyp['ldflags'])
 	ctx.env.append_unique('LIB_UV_FLAGS', from_gyp['libraries'])
