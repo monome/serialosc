@@ -39,7 +39,11 @@ monome_poll_cb(uv_poll_t *handle, int status, int events)
 		return;
 	}
 
-	while (monome_event_handle_next(self->state->monome));
+	while ((status = monome_event_handle_next(self->state->monome)) > 0);
+
+	if (status < 0)
+		uv_stop(self->loop);
+
 }
 
 static void
