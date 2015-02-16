@@ -19,21 +19,47 @@
 #include <poll.h>
 
 #include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
+
+static int
+recv_msg(struct sosc_state *state, int ipc_fd)
+{
+	struct sosc_ipc_msg msg;
+
+	if (sosc_ipc_msg_read(ipc_fd, &msg) <= 0)
+		return 0;
+
+	switch (msg.type) {
+	case SOSC_PROCESS_SHOULD_EXIT:
+		state->running = 0;
+		return 0;
+
+	default:
+		return -1;
+	}
+}
 
 int
-sosc_event_loop(const struct sosc_state *state)
+sosc_event_loop(struct sosc_state *state)
 {
-	struct pollfd fds[2];
+	struct pollfd fds[3];
+	int nfds;
 
 	fds[0].fd = monome_get_fd(state->monome);
-	fds[1].fd = lo_server_get_socket_fd(state->server);
-
 	fds[0].events = POLLIN;
+
+	fds[1].fd = lo_server_get_socket_fd(state->server);
 	fds[1].events = POLLIN;
 
-	for (;;) {
+	fds[2].fd = state->ipc_in_fd;
+	fds[2].events = POLLIN;
+	fds[2].revents = 0;
+
+	nfds = (state->ipc_in_fd > -1) ? 3 : 2;
+
+	for (state->running = 1; state->running;) {
 		/* block until either the monome or liblo have data */
-		if (poll(fds, 2, -1) < 0)
+		if (poll(fds, nfds, -1) < 0)
 			switch (errno) {
 			case EINVAL:
 				perror("error in poll()");
@@ -46,7 +72,7 @@ sosc_event_loop(const struct sosc_state *state)
 
 		/* is the monome still connected? */
 		if (fds[0].revents & (POLLHUP | POLLERR))
-			return 1;
+			break;
 
 		/* is there data available for reading from the monome? */
 		if (fds[0].revents & POLLIN)
@@ -55,5 +81,11 @@ sosc_event_loop(const struct sosc_state *state)
 		/* how about from OSC? */
 		if (fds[1].revents & POLLIN)
 			lo_server_recv_noblock(state->server, 0);
+
+		/* how about from the supervisor? */
+		if (fds[2].revents & POLLIN)
+			recv_msg(state, state->ipc_in_fd);
 	}
+
+	return 1;
 }

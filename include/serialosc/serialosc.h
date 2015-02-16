@@ -51,6 +51,8 @@ typedef struct {
 } sosc_config_t;
 
 typedef struct sosc_state {
+	int running;
+
 	monome_t *monome;
 	lo_address *outgoing;
 	lo_server *server;
@@ -65,7 +67,7 @@ typedef struct sosc_state {
 	sosc_config_t config;
 } sosc_state_t;
 
-int  sosc_event_loop(const sosc_state_t *state);
+int  sosc_event_loop(struct sosc_state *state);
 void sosc_server_run(monome_t *monome);
 
 int sosc_config_create_directory();
