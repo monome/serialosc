@@ -87,5 +87,5 @@ sosc_event_loop(struct sosc_state *state)
 			recv_msg(state, state->ipc_in_fd);
 	}
 
-	return 1;
+	return 0;
 }
