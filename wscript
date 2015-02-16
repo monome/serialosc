@@ -16,6 +16,36 @@ VERSION = "1.3"
 # dep checking functions
 #
 
+def check_poll(conf):
+	# borrowed from glib's poll test
+
+	code = """
+		#include <stdlib.h>
+		#include <poll.h>
+
+		int main(int argc, char **argv) {
+		    struct pollfd fds[1];
+
+		    fds[0].fd = open("/dev/null", 1);
+		    fds[0].events = POLLIN;
+
+		    if (poll(fds, 1, 0) < 0 || fds[0].revents & POLLNVAL)
+		        exit(1);
+		    exit(0);
+		}"""
+
+	conf.check_cc(
+		define_name="HAVE_WORKING_POLL",
+		mandatory=False,
+		quote=0,
+
+		execute=True,
+
+		fragment=code,
+
+		msg="Checking for working poll()",
+		errmsg="no (will use select())")
+
 def check_udev(conf):
 	conf.check_cc(
 		define_name="HAVE_LIBUDEV",
@@ -141,6 +171,9 @@ def configure(conf):
 	#
 
 	separator()
+
+	if conf.env.DEST_OS != "win32":
+		check_poll(conf)
 
 	if conf.env.DEST_OS == "linux":
 		check_udev(conf)

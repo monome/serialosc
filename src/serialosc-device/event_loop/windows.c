@@ -34,7 +34,7 @@ lo_thread(LPVOID param)
 }
 
 int
-sosc_event_loop(const sosc_state_t *state)
+sosc_event_loop(const struct sosc_state *state)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
 	HANDLE hres, lo_thd_res;

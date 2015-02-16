@@ -18,7 +18,12 @@ def build(ctx):
 		elif ctx.env.DEST_OS == 'darwin':
 			obj('zeroconf/darwin.c')
 
-	obj('event_loop/uv.c')
+	if ctx.env.DEST_OS[:3] == "win":
+		obj('event_loop/windows.c')
+	elif ctx.is_defined("HAVE_WORKING_POLL"):
+		obj('event_loop/poll.c')
+	else:
+		obj('event_loop/select.c')
 
 	obj('osc/mext_methods.c')
 	obj('osc/sys_methods.c')
