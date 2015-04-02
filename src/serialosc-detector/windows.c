@@ -31,34 +31,21 @@
 #define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
 
 struct detector_state {
-	HANDLE pipe_to_supervisor;
-
-	SERVICE_STATUS svc_status;
-	SERVICE_STATUS_HANDLE hstatus;
-};
-
-static struct detector_state state = {
-	.svc_status = {
-		.dwServiceType = SERVICE_WIN32,
-		.dwCurrentState = SERVICE_START_PENDING,
-		.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN,
-		.dwWin32ExitCode = 0,
-		.dwServiceSpecificExitCode = 0,
-		.dwCheckPoint = 0,
-		.dwWaitHint = 0
-	}
+	ATOM window_class;
+	HANDLE msg_window;
 };
 
 static void
 send_connect(char *port)
 {
+#if 0
 	uint8_t buf[64];
 	DWORD written;
 	size_t bufsiz;
 
 	sosc_ipc_msg_t m = {
 		.type = SOSC_DEVICE_CONNECTION,
-		.connection = {.devnode = port}
+		.connection.devnode = port
 	};
 
 	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), &m);
@@ -69,6 +56,9 @@ send_connect(char *port)
 	}
 
 	WriteFile(state.pipe_to_supervisor, buf, bufsiz, &written, NULL);
+#else
+	fprintf(stderr, "[>] got %s\n", port);
+#endif
 }
 
 static int
@@ -144,18 +134,18 @@ done:
 	return 0;
 }
 
-static char *
-ftdishit_to_port(char *bullshit)
+static int
+ftdishit_to_port(char *dst, size_t dst_size, const char *bullshit)
 {
-	char *subkey_path, *port, port_name[64];
+	char *subkey_path, *port;
 	DWORD plen, ptype;
 	HKEY subkey;
 
 	if (!(bullshit = strchr(bullshit, '#')))
-	    return NULL;
+		return -1;
 
 	if (!(port = strchr(++bullshit, '#')))
-		return NULL;
+		return -1;
 
 	*port = '\0';
 
@@ -170,72 +160,30 @@ ftdishit_to_port(char *bullshit)
 
 	default:
 		free(subkey_path);
-		return NULL;
+		return -1;
 	}
 
 	free(subkey_path);
 
-	plen = sizeof(port_name) / sizeof(char);
+	plen = dst_size;
 	ptype = REG_SZ;
 	switch (RegQueryValueEx(subkey, "PortName", 0, &ptype,
-	                        (unsigned char *) port_name, &plen)) {
+	                        (unsigned char *) dst, &plen)) {
 	case ERROR_SUCCESS:
-		port_name[plen] = '\0';
+		dst[plen] = '\0';
 		break;
 
 	default:
 		RegCloseKey(subkey);
-		return NULL;
+		return -1;
 	}
 
 	RegCloseKey(subkey);
-	return s_strdup(port_name);
-}
-
-DWORD WINAPI
-control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
-{
-	DEV_BROADCAST_DEVICEINTERFACE *dev;
-	char devname[256], *port;
-
-	switch (ctrl) {
-	case SERVICE_CONTROL_SHUTDOWN:
-	case SERVICE_CONTROL_STOP:
-		state.svc_status.dwWin32ExitCode = 0;
-		state.svc_status.dwCurrentState  = SERVICE_STOPPED;
-		SetServiceStatus(state.hstatus, &state.svc_status);
-		return NO_ERROR;
-
-	case SERVICE_CONTROL_INTERROGATE:
-		SetServiceStatus(state.hstatus, &state.svc_status);
-		return NO_ERROR;
-
-	case SERVICE_CONTROL_DEVICEEVENT:
-		switch (type) {
-		case DBT_DEVICEARRIVAL:
-			dev = data;
-			wcstombs(devname, (wchar_t *) dev->dbcc_name, sizeof(devname));
-			port = ftdishit_to_port(devname);
-
-			send_connect(port);
-
-			s_free(port);
-			break;
-
-		default:
-			break;
-		}
-		return NO_ERROR;
-
-	default:
-		break;
-	}
-
-	return ERROR_CALL_NOT_IMPLEMENTED;
+	return 0;
 }
 
 static int
-setup_device_notification(void)
+setup_device_notification(HANDLE window)
 {
 	DEV_BROADCAST_DEVICEINTERFACE filter;
 	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
@@ -247,109 +195,133 @@ setup_device_notification(void)
 	filter.dbcc_classguid = vcp_guid;
 	filter.dbcc_name[0] = '\0';
 
-	if (!RegisterDeviceNotification((HANDLE) state.hstatus, &filter,
-									DEVICE_NOTIFY_SERVICE_HANDLE))
+	if (!RegisterDeviceNotification(window, &filter,
+				DEVICE_NOTIFY_WINDOW_HANDLE))
 		return 1;
 	return 0;
 }
 
-static int
-open_pipe_to_supervisor(void)
+static void
+handle_device_arrival(struct detector_state *state,
+		DEV_BROADCAST_DEVICEINTERFACE *dev)
 {
-	HANDLE p = NULL;
-	DWORD pipe_state;
+	char devname[256], port[64];
 
-	do {
-		p = CreateFile(
-			SOSC_DETECTOR_PIPE,
-			GENERIC_WRITE,
-			0,
-			NULL,
-			OPEN_EXISTING,
-			0,
-			NULL);
-
-		if (p != INVALID_HANDLE_VALUE)
-			break;
-
-		switch (GetLastError()) {
-		case ERROR_FILE_NOT_FOUND:
-			Sleep(100);
-			continue;
-
-		default:
-			return -1;
-		}
-	} while (1);
-
-	pipe_state = PIPE_READMODE_MESSAGE;
-	SetNamedPipeHandleState(p, &pipe_state, NULL, NULL);
-
-	state.pipe_to_supervisor = p;
-
-	return 0;
-}
-
-static void WINAPI
-service_main(DWORD argc, LPTSTR *argv)
-{
-	state.hstatus = RegisterServiceCtrlHandlerEx(
-		SOSC_WIN_SERVICE_NAME, control_handler, NULL);
-
-	if (!state.hstatus)
+	/* XXX: we could theoretically rip out all this FTDI-specific nonsense
+	 *      and just get port notifications, but win32 libmonome only knows
+	 *      how to get serial numbers from FTDI devices anyway so there's
+	 *      no real win for that change. */
+	if (dev->dbcc_devicetype != DBT_DEVTYP_DEVICEINTERFACE)
 		return;
 
-	state.svc_status.dwCurrentState = SERVICE_RUNNING;
-	SetServiceStatus(state.hstatus, &state.svc_status);
+	wcstombs(devname, (void *) dev->dbcc_name, sizeof(devname));
+	if (ftdishit_to_port(port, sizeof(port), devname))
+		return;
 
-	if (open_pipe_to_supervisor())
-		goto err_supervisor_pipe;
+	fprintf(stderr, " :: >> arrival %s\n", port);
+}
 
-	if (setup_device_notification())
-		goto err_rdnotification;
+static LRESULT CALLBACK
+wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
+{
+	struct detector_state *state = GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
-	scan_connected_devices();
-	return;
+	switch (message) {
+	case WM_CREATE:
+		setup_device_notification(hwnd);
+		return 1;
 
-err_rdnotification:
-	CloseHandle(state.pipe_to_supervisor);
-err_supervisor_pipe:
-	state.svc_status.dwCurrentState = SERVICE_STOPPED;
-	state.svc_status.dwWin32ExitCode = 1;
-	SetServiceStatus(state.hstatus, &state.svc_status);
-	return;
+	case WM_DEVICECHANGE:
+		switch (wparam) {
+		case DBT_DEVICEARRIVAL:
+			handle_device_arrival(state, (void *) lparam);
+			break;
+
+		case DBT_DEVICEREMOVECOMPLETE:
+			fprintf(stderr, " :: << removal\n");
+			break;
+		}
+		return 1;
+
+	default:
+		return DefWindowProcW(hwnd, message, wparam, lparam);
+	}
+}
+
+static ATOM
+register_window_class(void)
+{
+	WNDCLASSW wc = {
+		.style         = CS_OWNDC,
+		.lpfnWndProc   = wndproc,
+
+		.cbClsExtra    = 0,
+		.cbWndExtra    = 0,
+		.hInstance     = 0,
+
+		.hIcon         = LoadIcon(NULL, IDI_APPLICATION),
+		.hCursor       = LoadCursor(NULL, IDC_ARROW),
+		.hbrBackground = NULL,
+
+		.lpszMenuName  = NULL,
+		.lpszClassName = L"serialosc_detector"
+	};
+
+	return RegisterClassW(&wc);
 }
 
 static void
-debug_main(void)
+unregister_window_class(ATOM cls)
 {
-	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
+	UnregisterClassW((void *) MAKEINTATOM(cls), NULL);
+}
 
-	open_pipe_to_supervisor();
-	scan_connected_devices();
+#ifndef WM_DISABLED
+#define WM_DISABLED 0x08000000L
+#endif
 
-	while(1)
-		Sleep(10000);
+static HANDLE
+open_msg_window(struct detector_state *state)
+{
+	HANDLE wnd;
+
+	wnd = CreateWindowExW(0, (void *) MAKEINTATOM(state->window_class),
+			L"<serialosc detector message receiver>", WM_DISABLED,
+			0, 0, 0, 0, NULL, NULL, NULL, (void *) state);
+
+	if (!wnd)
+		return NULL;
+
+	SetWindowLongPtr(wnd, GWLP_USERDATA, (LONG_PTR) state);
+	return wnd;
+}
+
+static void
+event_loop(struct detector_state *state)
+{
+	int status;
+	MSG msg;
+
+	while ((status = GetMessage(&msg, state->msg_window, 0, 0)) > 0) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
 }
 
 int
 main(int argc, char **argv)
 {
-	SERVICE_TABLE_ENTRY services[] = {
-		{SOSC_WIN_SERVICE_NAME, service_main},
-		{NULL, NULL}
-	};
+	struct detector_state state;
 
-	if (!StartServiceCtrlDispatcher(services)) {
-		switch (GetLastError()) {
-		case ERROR_FAILED_SERVICE_CONTROLLER_CONNECT:
-			debug_main();
-			break;
+	state.window_class = register_window_class();
+	state.msg_window   = open_msg_window(&state);
 
-		default:
-			break;
-		}
-	}
+	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
+	scan_connected_devices();
+
+	event_loop(&state);
+
+	unregister_window_class(state.window_class);
 
 	return 0;
 }
