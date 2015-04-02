@@ -69,17 +69,6 @@ def check_liblo(conf):
 
 		msg="Checking for liblo")
 
-def check_confuse(conf):
-	conf.check_cc(
-		define_name="HAVE_CONFUSE",
-		mandatory=True,
-		quote=0,
-
-		lib="confuse",
-		uselib_store="CONFUSE",
-
-		msg="Checking for libconfuse")
-
 def check_libmonome(conf):
 	conf.check_cc(
 		define_name="HAVE_LIBMONOME",
@@ -92,6 +81,19 @@ def check_libmonome(conf):
 
 		msg="Checking for libmonome")
 
+def check_strfuncs(ctx):
+	check = lambda func_name: ctx.check_cc(
+			define_name='HAVE_{}'.format(func_name.upper()),
+			mandatory=False,
+			quote=0,
+
+			header_name='string.h',
+			function_name=func_name)
+
+	check('strdup')
+	check('_strdup')
+	check('strndup')
+	check('strcasecmp')
 
 def check_dnssd_win(conf):
 	conf.check_cc(
@@ -154,6 +156,7 @@ def configure(conf):
 	separator()
 	conf.load("compiler_c")
 	conf.load("gnu_dirs")
+	conf.load('flex')
 	load_tools(conf)
 
 	if conf.env.DEST_OS == "win32":
@@ -180,7 +183,10 @@ def configure(conf):
 
 	check_libmonome(conf)
 	check_liblo(conf)
-	check_confuse(conf)
+
+	# stuff for libconfuse
+	check_strfuncs(conf)
+	conf.check_cc(define_name='HAVE_UNISTD_H', header_name='unistd.h')
 
 	if conf.env.DEST_OS == "win32":
 		if not conf.options.disable_zeroconf:

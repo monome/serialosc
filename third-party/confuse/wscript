@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+
+top = '../..'
+
+def build(ctx):
+	t = ctx.stlib(
+		source=['confuse.c', 'lexer.c'],
+
+		defines=[
+			'PACKAGE_VERSION="2.7"',
+			'PACKAGE_STRING="libConfuse 2.7"'],
+
+		target='confuse')
+
+# vim: set ts=4 sts=4 noet :

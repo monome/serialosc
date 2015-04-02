@@ -38,4 +38,4 @@ def build(ctx):
 		source=objs,
 		target='../../bin/serialosc-device',
 
-		use='serialosc-common LO CONFUSE LIBMONOME DNSSD_INC DL LIBUV')
+		use='serialosc-common LO LIBMONOME DNSSD_INC DL LIBUV confuse')

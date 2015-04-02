@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-top = ".."
+top = '..'
 
 def build_uv(ctx):
 	from_gyp = ctx.target_from_gyp('libuv/uv.gyp', 'libuv')
@@ -52,5 +52,6 @@ def build_uv(ctx):
 
 def build(ctx):
 	build_uv(ctx)
+	ctx.recurse('confuse')
 
 # vim: set ts=4 sts=4 noet :
