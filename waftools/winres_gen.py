@@ -26,23 +26,23 @@ def win_version_string(version):
 
 @feature('winres_gen')
 @before_method('apply_link')
-def winres_gen(ctx):
-	executable = os.path.basename(ctx.target)
+def winres_gen(self):
+	executable = os.path.basename(self.target)
 
 	src_path = 'src/common/platform/winres/serialosc.rc.in'
 	tgt_path = '{}.rc'.format(os.path.splitext(executable)[0])
 
-	src = ctx.bld.srcnode.find_node(src_path)
-	tgt = ctx.path.get_bld().find_or_declare(tgt_path)
+	src = self.bld.srcnode.find_node(src_path)
+	tgt = self.path.get_bld().find_or_declare(tgt_path)
 
-	subst_task = ctx.create_task('subst', src, tgt)
+	subst_task = self.create_task('subst', src, tgt)
 	subst_task.install_path = None
 
 	subst_task.generator.dct = {
 		'EXECUTABLE': executable,
-		'GIT_COMMIT': ctx.env.GIT_COMMIT,
-		'WIN_VERSION': win_version_string(ctx.env.VERSION),
-		'VERSION': ctx.env.VERSION
+		'GIT_COMMIT': self.env.GIT_COMMIT,
+		'WIN_VERSION': win_version_string(self.env.VERSION),
+		'VERSION': self.env.VERSION
 	}
 
 # vim: set ts=4 sts=4 noet :

@@ -16,11 +16,19 @@
 
 #include <stdio.h>
 
+#include <winsock2.h>
 #include <windows.h>
-#include <Winsock.h>
 #include <io.h>
 
 #include <serialosc/serialosc.h>
+
+#ifdef _LP64
+#define PRIdword  "d"
+#define PRIudword "u"
+#else
+#define PRIdword  "ld"
+#define PRIudword "lu"
+#endif
 
 static DWORD WINAPI
 lo_thread(LPVOID param)
@@ -34,7 +42,7 @@ lo_thread(LPVOID param)
 }
 
 int
-sosc_event_loop(const struct sosc_state *state)
+sosc_event_loop(struct sosc_state *state)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
 	HANDLE hres, lo_thd_res;
@@ -62,7 +70,8 @@ sosc_event_loop(const struct sosc_state *state)
 				return 1;
 
 			default:
-				fprintf(stderr, "event_loop() error: %d\n", GetLastError());
+				fprintf(stderr, "event_loop() error: %"PRIdword"\n",
+						GetLastError());
 				return 1;
 			}
 
@@ -76,7 +85,7 @@ sosc_event_loop(const struct sosc_state *state)
 
 		case WAIT_ABANDONED_0:
 		case WAIT_FAILED:
-			fprintf(stderr, "event_loop(): wait failed: %ld\n",
+			fprintf(stderr, "event_loop(): wait failed: %"PRIdword"\n",
 			        GetLastError());
 			return 1;
 		}
