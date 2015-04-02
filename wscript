@@ -154,9 +154,8 @@ def configure(conf):
 		override_find_program(xcomp_prefix)
 
 	separator()
-	conf.load("compiler_c")
-	conf.load("gnu_dirs")
-	conf.load('flex')
+	conf.load('compiler_c')
+	conf.load('gnu_dirs')
 	load_tools(conf)
 
 	if conf.env.DEST_OS == "win32":
