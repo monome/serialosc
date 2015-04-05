@@ -31,6 +31,8 @@
 #define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
 
 struct detector_state {
+	HANDLE to_supervisor;
+
 	ATOM window_class;
 	HANDLE msg_window;
 
@@ -38,9 +40,8 @@ struct detector_state {
 };
 
 static void
-send_connect(char *port)
+send_connect(const struct detector_state *state, char *port)
 {
-#if 0
 	uint8_t buf[64];
 	DWORD written;
 	size_t bufsiz;
@@ -50,6 +51,11 @@ send_connect(char *port)
 		.connection.devnode = port
 	};
 
+	if (!state->to_supervisor) {
+		fprintf(stderr, " [>] %s connected\n", port);
+		return;
+	}
+
 	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), &m);
 
 	if (bufsiz < 0) {
@@ -57,14 +63,11 @@ send_connect(char *port)
 		return;
 	}
 
-	WriteFile(state.pipe_to_supervisor, buf, bufsiz, &written, NULL);
-#else
-	fprintf(stderr, "[>] got %s\n", port);
-#endif
+	WriteFile(state->to_supervisor, buf, bufsiz, &written, NULL);
 }
 
 static int
-scan_connected_devices(void)
+scan_connected_devices(const struct detector_state *state)
 {
 	HKEY key, subkey;
 	char subkey_name[MAX_PATH], *subkey_path;
@@ -125,7 +128,7 @@ scan_connected_devices(void)
 			goto next;
 		}
 
-		send_connect((char *) port_name);
+		send_connect(state, (char *) port_name);
 
 next:
 		RegCloseKey(subkey);
@@ -228,7 +231,7 @@ handle_device_arrival(struct detector_state *state,
 	if (ftdishit_to_port(port, sizeof(port), devname))
 		return;
 
-	fprintf(stderr, " :: >> arrival %s\n", port);
+	send_connect(state, port);
 }
 
 static LRESULT CALLBACK
@@ -246,15 +249,9 @@ wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 		return 1;
 
 	case WM_DEVICECHANGE:
-		switch (wparam) {
-		case DBT_DEVICEARRIVAL:
+		if (wparam == DBT_DEVICEARRIVAL)
 			handle_device_arrival(state, (void *) lparam);
-			break;
 
-		case DBT_DEVICEREMOVECOMPLETE:
-			fprintf(stderr, " :: << removal\n");
-			break;
-		}
 		return 1;
 
 	default:
@@ -322,17 +319,29 @@ event_loop(struct detector_state *state)
 	}
 }
 
+static HANDLE
+get_handle_to_supervisor(void)
+{
+	HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	if (GetFileType(out) == FILE_TYPE_PIPE)
+		return out;
+	return NULL;
+}
+
 int
 main(int argc, char **argv)
 {
 	struct detector_state state;
 
-	state.window_class = register_window_class();
-	state.msg_window   = open_msg_window(&state);
+	state.to_supervisor = get_handle_to_supervisor();
+	state.window_class  = register_window_class();
+	state.msg_window    = open_msg_window(&state);
 
-	fprintf(stderr, "[!] running in debug mode, hotplugging disabled\n");
-	scan_connected_devices();
+	if (!state.to_supervisor)
+		fprintf(stderr, " [-] serialosc-detector running in debug mode\n");
 
+	scan_connected_devices(&state);
 	event_loop(&state);
 
 	DestroyWindow(state.msg_window);
