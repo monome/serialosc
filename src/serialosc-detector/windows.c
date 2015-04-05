@@ -33,6 +33,8 @@
 struct detector_state {
 	ATOM window_class;
 	HANDLE msg_window;
+
+	HANDLE ftdi_notify;
 };
 
 static void
@@ -183,7 +185,7 @@ ftdishit_to_port(char *dst, size_t dst_size, const char *bullshit)
 }
 
 static int
-setup_device_notification(HANDLE window)
+init_device_notification(struct detector_state *state)
 {
 	DEV_BROADCAST_DEVICEINTERFACE filter;
 	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
@@ -195,10 +197,18 @@ setup_device_notification(HANDLE window)
 	filter.dbcc_classguid = vcp_guid;
 	filter.dbcc_name[0] = '\0';
 
-	if (!RegisterDeviceNotification(window, &filter,
-				DEVICE_NOTIFY_WINDOW_HANDLE))
+	state->ftdi_notify = RegisterDeviceNotification(state->msg_window,
+			&filter, DEVICE_NOTIFY_WINDOW_HANDLE);
+
+	if (!state->ftdi_notify)
 		return 1;
 	return 0;
+}
+
+static void
+fini_device_notification(struct detector_state *state)
+{
+	UnregisterDeviceNotification(state->ftdi_notify);
 }
 
 static void
@@ -228,7 +238,11 @@ wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 
 	switch (message) {
 	case WM_CREATE:
-		setup_device_notification(hwnd);
+		init_device_notification(state);
+		return 1;
+
+	case WM_DESTROY:
+		fini_device_notification(state);
 		return 1;
 
 	case WM_DEVICECHANGE:
@@ -321,6 +335,7 @@ main(int argc, char **argv)
 
 	event_loop(&state);
 
+	DestroyWindow(state.msg_window);
 	unregister_window_class(state.window_class);
 
 	return 0;
