@@ -64,6 +64,8 @@ wait_on_parent_usbdevice(io_service_t device)
 
 		if (IOObjectConformsTo(device, kIOUSBDeviceClassName))
 			break;
+		if (IOObjectConformsTo(device, "IOUSBHostDevice"))
+                        break;
 	}
 
 	/* wait until the device is ready to be opened */
