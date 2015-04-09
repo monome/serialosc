@@ -252,6 +252,7 @@ sosc_ipc_msg_to_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t *msg)
 	case SOSC_DEVICE_READY:
 	case SOSC_DEVICE_DISCONNECTION:
 	case SOSC_OSC_PORT_CHANGE:
+	case SOSC_PROCESS_SHOULD_EXIT:
 		strbytes = 0;
 		break;
 
@@ -366,6 +367,7 @@ sosc_ipc_msg_from_buf(uint8_t *buf, size_t nbytes, sosc_ipc_msg_t **msg)
 	case SOSC_DEVICE_READY:
 	case SOSC_DEVICE_DISCONNECTION:
 	case SOSC_OSC_PORT_CHANGE:
+	case SOSC_PROCESS_SHOULD_EXIT:
 		strbytes = 0;
 		break;
 

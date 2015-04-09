@@ -50,9 +50,7 @@ typedef enum {
 
 struct sosc_subprocess {
 	uv_process_t proc;
-	int incoming_pipe_fd;
-	int outgoing_pipe_fd;
-	uv_poll_t poll;
+	uv_pipe_t to_proc, from_proc;
 };
 
 struct sosc_notification_endpoint {
@@ -101,19 +99,10 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		char *exe_path, uv_exit_cb exit_cb, char *arg)
 {
 	struct uv_process_options_s options;
-	int pipefds[2][2], err;
+	int err;
 
-	err = pipe(pipefds[0]);
-	if (err < 0) {
-		perror("launch_subprocess() failed in pipe()");
-		goto err_pipe0;
-	}
-
-	err = pipe(pipefds[1]);
-	if (err < 0) {
-		perror("launch_subprocess() failed in pipe()");
-		goto err_pipe1;
-	}
+	uv_pipe_init(self->loop, &proc->to_proc, 1);
+	uv_pipe_init(self->loop, &proc->from_proc, 1);
 
 	options = (struct uv_process_options_s) {
 		.exit_cb = exit_cb,
@@ -125,40 +114,61 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		.stdio_count = 2,
 		.stdio = (struct uv_stdio_container_s []) {
 			[STDIN_FILENO] = {
-				.flags   = UV_INHERIT_FD,
-				.data.fd = pipefds[0][0]
+				.flags       = UV_CREATE_PIPE | UV_READABLE_PIPE,
+				.data.stream = (void *) &proc->to_proc
 			},
 
 			[STDOUT_FILENO] = {
-				.flags   = UV_INHERIT_FD,
-				.data.fd = pipefds[1][1]
+				.flags       = UV_CREATE_PIPE | UV_WRITABLE_PIPE,
+				.data.stream = (void *) &proc->from_proc
 			}
 		},
 	};
 
 	err = uv_spawn(self->loop, &proc->proc, &options);
-	close(pipefds[0][0]);
-	close(pipefds[1][1]);
+	if (err)
+		fprintf(stderr, " [-] uv_spawn failed: %s\n", uv_strerror(err));
 
-	if (err < 0) {
-		fprintf(stderr, "launch_subprocess() failed in uv_spawn(): %s\n",
-				uv_strerror(err));
-		goto err_spawn;
+	return err;
+}
+
+static void
+from_proc_alloc_buf(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
+{
+	buf->base = malloc(suggested_size);
+	buf->len  = suggested_size;
+}
+
+typedef int (*sosc_ipc_msg_handler_cb_t)
+	(struct sosc_supervisor *, struct sosc_device_subprocess *,
+	 struct sosc_ipc_msg *);
+
+static void
+dispatch_ipc_msgs(uv_stream_t *stream, ssize_t nbytes, const uv_buf_t *buf,
+		sosc_ipc_msg_handler_cb_t cb, struct sosc_supervisor *self,
+		struct sosc_device_subprocess *dev)
+{
+	struct sosc_ipc_msg *msg;
+	uint8_t *buf_cursor;
+	ssize_t msg_nbytes;
+
+	buf_cursor = (void *) buf->base;
+
+	while (nbytes > 0) {
+		msg_nbytes = sosc_ipc_msg_from_buf(buf_cursor, nbytes, &msg);
+
+		if (nbytes < 0) {
+			fprintf(stderr, " [-] bad message, bailing out\n");
+			return;
+		}
+
+		cb(self, dev, msg);
+
+		buf_cursor += msg_nbytes;
+		nbytes     -= msg_nbytes;
 	}
 
-	proc->outgoing_pipe_fd = pipefds[0][1];
-	proc->incoming_pipe_fd = pipefds[1][0];
-	uv_poll_init(self->loop, &proc->poll, proc->incoming_pipe_fd);
-	return 0;
-
-err_spawn:
-	close(pipefds[1][0]);
-	close(pipefds[1][1]);
-err_pipe1:
-	close(pipefds[0][0]);
-	close(pipefds[0][1]);
-err_pipe0:
-	return err;
+	free(buf->base);
 }
 
 /*************************************************************************
@@ -166,7 +176,7 @@ err_pipe0:
  *************************************************************************/
 
 static void detector_exit_cb(uv_process_t *, int64_t, int);
-static void detector_pipe_cb(uv_poll_t *, int, int);
+static void detector_read_cb(uv_stream_t *, ssize_t, const uv_buf_t *);
 
 static void
 remaining_subprocesses_walk_cb(uv_handle_t *handle, void *args)
@@ -210,6 +220,29 @@ done:
 }
 
 static void
+ipc_msg_write_cb(uv_write_t *req, int status)
+{
+	free(req);
+}
+
+static void
+write_ipc_msg_to_stream(uv_stream_t *stream, struct sosc_ipc_msg *msg)
+{
+	uv_buf_t uv_buf;
+	uv_write_t *req;
+	uint8_t buf[64];
+	ssize_t nbytes;
+
+	nbytes = sosc_ipc_msg_to_buf(buf, sizeof(buf), msg);
+	if (nbytes < 0)
+		return;
+
+	req = calloc(1, sizeof(*req));
+	uv_buf = uv_buf_init((void *) buf, nbytes);
+	uv_write(req, stream, &uv_buf, 1, ipc_msg_write_cb);
+}
+
+static void
 kill_devices_walk_cb(uv_handle_t *handle, void *_args)
 {
 	struct sosc_device_subprocess *dev;
@@ -221,7 +254,7 @@ kill_devices_walk_cb(uv_handle_t *handle, void *_args)
 		return;
 
 	dev = container_of(handle, struct sosc_device_subprocess, subprocess.proc);
-	sosc_ipc_msg_write(dev->subprocess.outgoing_pipe_fd, &msg);
+	write_ipc_msg_to_stream((void *) &dev->subprocess.to_proc, &msg);
 }
 
 static int
@@ -235,11 +268,12 @@ supervisor__change_state(struct sosc_supervisor *self,
 	switch (new_state) {
 	case SERIALOSC_ENABLED:
 		if (launch_subprocess(self, &self->detector, self->detector_exe_path,
-					detector_exit_cb, "-d"))
+					detector_exit_cb, NULL))
 			return -1;
 
 		self->detector.proc.data = &detector_type;
-		uv_poll_start(&self->detector.poll, UV_READABLE, detector_pipe_cb);
+		uv_read_start((void *) &self->detector.from_proc,
+				from_proc_alloc_buf, detector_read_cb);
 		break;
 
 	case SERIALOSC_DISABLED:
@@ -502,13 +536,9 @@ device_proc_close_cb(uv_handle_t *handle)
 }
 
 static void
-device_poll_close_cb(uv_handle_t *handle)
+device_pipe_close_cb(uv_handle_t *handle)
 {
-	DEV_FROM(handle, subprocess.poll);
-
-	close(dev->subprocess.incoming_pipe_fd);
-	close(dev->subprocess.outgoing_pipe_fd);
-
+	DEV_FROM(handle, subprocess.from_proc);
 	uv_close((void *) &dev->subprocess.proc, device_proc_close_cb);
 }
 
@@ -524,7 +554,7 @@ device_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 		osc_notify(dev->supervisor, dev, SOSC_DEVICE_DISCONNECTION);
 	}
 
-	uv_close((void *) &dev->subprocess.poll, device_poll_close_cb);
+	uv_close((void *) &dev->subprocess.from_proc, device_pipe_close_cb);
 }
 
 /*************************************************************************
@@ -565,20 +595,17 @@ handle_device_msg(struct sosc_supervisor *self,
 }
 
 static void
-device_pipe_cb(uv_poll_t *handle, int status, int events)
+device_read_cb(uv_stream_t *stream, ssize_t nbytes, const uv_buf_t *buf)
 {
-	DEV_FROM(handle, subprocess.poll);
-	struct sosc_ipc_msg msg;
+	DEV_FROM(stream, subprocess.from_proc);
 
-	if (sosc_ipc_msg_read(dev->subprocess.incoming_pipe_fd, &msg) > 0)
-		handle_device_msg(dev->supervisor, dev, &msg);
+	dispatch_ipc_msgs(stream, nbytes, buf, handle_device_msg,
+			dev->supervisor, dev);
 }
 
 /*************************************************************************
  * detector communication
  *************************************************************************/
-
-static void device_pipe_cb(uv_poll_t *, int status, int events);
 
 static int
 handle_connection(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
@@ -591,7 +618,8 @@ handle_connection(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
 	if (device_init(self, dev, msg->connection.devnode))
 		goto err_init;
 
-	uv_poll_start(&dev->subprocess.poll, UV_READABLE, device_pipe_cb);
+	uv_read_start((void *) &dev->subprocess.from_proc, from_proc_alloc_buf,
+			device_read_cb);
 	return 0;
 
 err_init:
@@ -601,7 +629,8 @@ err_calloc:
 }
 
 static int
-handle_detector_msg(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
+handle_detector_msg(struct sosc_supervisor *self,
+		struct sosc_device_subprocess *dev, struct sosc_ipc_msg *msg)
 {
 	int ret;
 
@@ -623,12 +652,9 @@ handle_detector_msg(struct sosc_supervisor *self, struct sosc_ipc_msg *msg)
 }
 
 static void
-detector_poll_close_cb(uv_handle_t *handle)
+detector_pipe_close_cb(uv_handle_t *handle)
 {
-	SELF_FROM(handle, detector.poll);
-	close(self->detector.incoming_pipe_fd);
-	close(self->detector.outgoing_pipe_fd);
-
+	SELF_FROM(handle, detector.from_proc);
 	uv_close((void *) &self->detector.proc, NULL);
 }
 
@@ -636,18 +662,14 @@ static void
 detector_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 {
 	SELF_FROM(process, detector.proc);
-
-	uv_close((void *) &self->detector.poll, detector_poll_close_cb);
+	uv_close((void *) &self->detector.from_proc, detector_pipe_close_cb);
 }
 
 static void
-detector_pipe_cb(uv_poll_t *handle, int status, int events)
+detector_read_cb(uv_stream_t *stream, ssize_t nbytes, const uv_buf_t *buf)
 {
-	SELF_FROM(handle, detector.poll);
-	struct sosc_ipc_msg msg;
-
-	if (sosc_ipc_msg_read(self->detector.incoming_pipe_fd, &msg) > 0)
-		handle_detector_msg(self, &msg);
+	SELF_FROM(stream, detector.from_proc);
+	dispatch_ipc_msgs(stream, nbytes, buf, handle_detector_msg, self, NULL);
 }
 
 /*************************************************************************
@@ -709,7 +731,7 @@ main(int argc, char **argv)
 	if (cache_paths(&self))
 		goto err_cache_paths;
 
-	self.loop  = uv_default_loop();
+	self.loop = uv_default_loop();
 	VECTOR_INIT(&self.notifications, 32);
 
 	uv_idle_init(self.loop, &self.state_change.check);
