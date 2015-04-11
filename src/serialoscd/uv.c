@@ -554,6 +554,7 @@ device_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 		osc_notify(dev->supervisor, dev, SOSC_DEVICE_DISCONNECTION);
 	}
 
+	uv_close((void *) &dev->subprocess.to_proc, NULL);
 	uv_close((void *) &dev->subprocess.from_proc, device_pipe_close_cb);
 }
 
@@ -662,6 +663,7 @@ static void
 detector_exit_cb(uv_process_t *process, int64_t exit_status, int term_signal)
 {
 	SELF_FROM(process, detector.proc);
+	uv_close((void *) &self->detector.to_proc, NULL);
 	uv_close((void *) &self->detector.from_proc, detector_pipe_close_cb);
 }
 
