@@ -5,6 +5,7 @@ top = '../..'
 def build(ctx):
 	t = ctx.stlib(
 		source=['confuse.c', 'lexer.c'],
+		export_includes=['.'],
 
 		defines=[
 			'PACKAGE_VERSION="2.7"',
