@@ -25,7 +25,7 @@ def build_common(ctx):
 		use='serialosc-include')
 
 def build(ctx):
-	ctx(export_includes=['..', '../include', '../third-party'],
+	ctx(export_includes=['..', '../include', '../third-party', '../third-party/confuse'],
 			name='serialosc-include')
 
 	build_common(ctx)
