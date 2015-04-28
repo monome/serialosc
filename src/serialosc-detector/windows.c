@@ -240,10 +240,6 @@ wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 	struct detector_state *state = GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
 	switch (message) {
-	case WM_CREATE:
-		init_device_notification(state);
-		return 1;
-
 	case WM_DESTROY:
 		fini_device_notification(state);
 		return 1;
@@ -297,8 +293,8 @@ open_msg_window(struct detector_state *state)
 	HANDLE wnd;
 
 	wnd = CreateWindowExW(0, (void *) MAKEINTATOM(state->window_class),
-			L"<serialosc detector message receiver>", WM_DISABLED,
-			0, 0, 0, 0, NULL, NULL, NULL, (void *) state);
+			L"serialosc detector", WM_DISABLED, 0, 0, 1, 1,
+			NULL, NULL, NULL, NULL);
 
 	if (!wnd)
 		return NULL;
@@ -337,6 +333,8 @@ main(int argc, char **argv)
 	state.to_supervisor = get_handle_to_supervisor();
 	state.window_class  = register_window_class();
 	state.msg_window    = open_msg_window(&state);
+
+	init_device_notification(&state);
 
 	if (!state.to_supervisor)
 		fprintf(stderr, " [-] serialosc-detector running in debug mode\n");
