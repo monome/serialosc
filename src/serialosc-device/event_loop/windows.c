@@ -30,32 +30,23 @@
 #define PRIudword "lu"
 #endif
 
-static DWORD WINAPI
-lo_thread(LPVOID param)
-{
-	sosc_state_t *state = param;
-
-	for (;;)
-		lo_server_recv(state->server);
-
-	return 0;
-}
-
 int
 sosc_event_loop(struct sosc_state *state)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
-	HANDLE hres, lo_thd_res;
+	HANDLE hres, wait_handles[2];
 	DWORD evt_mask;
+	ssize_t nbytes;
+	int nhandles;
+
+	nhandles = 2;
+	wait_handles[0] = ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	wait_handles[1] = WSACreateEvent();
+	WSAEventSelect(lo_server_get_socket_fd(state->server),
+			wait_handles[1], FD_READ);
 
 	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
-	lo_thd_res = CreateThread(NULL, 0, lo_thread, (void *) state, 0, NULL);
-
-	if (!(ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL))) {
-		fprintf(stderr, "serialosc: event_loop: can't allocate event (%ld)\n",
-		        GetLastError());
-		return 1;
-	}
 
 	for (;;) {
 		SetCommMask(hres, EV_RXCHAR);
@@ -75,9 +66,21 @@ sosc_event_loop(struct sosc_state *state)
 				return 1;
 			}
 
-		switch (WaitForSingleObject(ov.hEvent, INFINITE)) {
+		switch (WaitForMultipleObjects(nhandles, wait_handles, FALSE,
+					INFINITE)) {
 		case WAIT_OBJECT_0:
-			while (monome_event_handle_next(state->monome));
+			do {
+				nbytes = monome_event_handle_next(state->monome);
+
+				if (nbytes < 0)
+					return 1;
+			} while (nbytes > 0);
+
+			break;
+
+		case WAIT_OBJECT_0 + 1:
+			lo_server_recv_noblock(state->server, 0);
+			WSAResetEvent(wait_handles[1]);
 			break;
 
 		case WAIT_TIMEOUT:
@@ -91,6 +94,5 @@ sosc_event_loop(struct sosc_state *state)
 		}
 	}
 
-	((void) lo_thd_res); /* shut GCC up about this being an unused variable */
 	return 0;
 }
