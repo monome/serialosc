@@ -21,6 +21,7 @@
 #include <io.h>
 
 #include <serialosc/serialosc.h>
+#include <serialosc/ipc.h>
 
 #ifdef _LP64
 #define PRIdword  "d"
@@ -30,25 +31,46 @@
 #define PRIudword "lu"
 #endif
 
+static int
+recv_msg(struct sosc_state *state, int ipc_fd)
+{
+	struct sosc_ipc_msg msg;
+
+	if (sosc_ipc_msg_read(ipc_fd, &msg) <= 0)
+		return 0;
+
+	switch (msg.type) {
+	case SOSC_PROCESS_SHOULD_EXIT:
+		state->running = 0;
+		return 0;
+
+	default:
+		return -1;
+	}
+}
+
 int
 sosc_event_loop(struct sosc_state *state)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
-	HANDLE hres, wait_handles[2];
+	HANDLE hres, wait_handles[3];
 	DWORD evt_mask;
 	ssize_t nbytes;
 	int nhandles;
 
-	nhandles = 2;
 	wait_handles[0] = ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
 	wait_handles[1] = WSACreateEvent();
 	WSAEventSelect(lo_server_get_socket_fd(state->server),
 			wait_handles[1], FD_READ);
 
+	wait_handles[2] = GetStdHandle(STD_INPUT_HANDLE);
+
+	nhandles = (state->ipc_in_fd > -1) ? 3 : 2;
+
 	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
 
-	for (;;) {
+	for (state->running = 1; state->running;) {
 		SetCommMask(hres, EV_RXCHAR);
 
 		if (!WaitCommEvent(hres, &evt_mask, &ov))
@@ -81,6 +103,10 @@ sosc_event_loop(struct sosc_state *state)
 		case WAIT_OBJECT_0 + 1:
 			lo_server_recv_noblock(state->server, 0);
 			WSAResetEvent(wait_handles[1]);
+			break;
+
+		case WAIT_OBJECT_0 + 2:
+			recv_msg(state, state->ipc_in_fd);
 			break;
 
 		case WAIT_TIMEOUT:

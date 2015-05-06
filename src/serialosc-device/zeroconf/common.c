@@ -15,7 +15,6 @@
  */
 
 #include <stdio.h>
-#include <dns_sd.h>
 
 #include <serialosc/serialosc.h>
 #include <serialosc/zeroconf.h>
