@@ -101,8 +101,15 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 	struct uv_process_options_s options;
 	int err;
 
+#if WIN32
+	/* libuv bug with IPC pipes. */
+
+	uv_pipe_init(self->loop, &proc->to_proc, 0);
+	uv_pipe_init(self->loop, &proc->from_proc, 0);
+#else
 	uv_pipe_init(self->loop, &proc->to_proc, 1);
 	uv_pipe_init(self->loop, &proc->from_proc, 1);
+#endif
 
 	options = (struct uv_process_options_s) {
 		.exit_cb = exit_cb,

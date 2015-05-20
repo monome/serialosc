@@ -49,14 +49,34 @@ recv_msg(struct sosc_state *state, int ipc_fd)
 	}
 }
 
+struct poll_thread_ctx {
+	struct sosc_state *state;
+	HANDLE wakeup_handle;
+};
+
+static DWORD WINAPI
+stdin_poll_thread(LPVOID _ctx)
+{
+	struct poll_thread_ctx *ctx = _ctx;
+
+	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), ENABLE_PROCESSED_INPUT);
+
+	for (;;) {
+		recv_msg(ctx->state, STDIN_FILENO);
+		SetEvent(ctx->wakeup_handle);
+	}
+
+	return 0;
+}
+
 int
 sosc_event_loop(struct sosc_state *state)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
 	HANDLE hres, wait_handles[3];
+	struct poll_thread_ctx ctx;
 	DWORD evt_mask;
 	ssize_t nbytes;
-	int nhandles;
 
 	wait_handles[0] = ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
@@ -64,13 +84,20 @@ sosc_event_loop(struct sosc_state *state)
 	WSAEventSelect(lo_server_get_socket_fd(state->server),
 			wait_handles[1], FD_READ);
 
-	wait_handles[2] = GetStdHandle(STD_INPUT_HANDLE);
+	wait_handles[2] = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-	nhandles = (state->ipc_in_fd > -1) ? 3 : 2;
+	state->running = 1;
+
+	if (state->ipc_in_fd > -1 || 1) {
+		ctx.state = state;
+		ctx.wakeup_handle = wait_handles[2];
+
+		CreateThread(NULL, 0, stdin_poll_thread, &ctx, 0, NULL);
+	}
 
 	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
 
-	for (state->running = 1; state->running;) {
+	while (state->running) {
 		SetCommMask(hres, EV_RXCHAR);
 
 		if (!WaitCommEvent(hres, &evt_mask, &ov))
@@ -88,8 +115,7 @@ sosc_event_loop(struct sosc_state *state)
 				return 1;
 			}
 
-		switch (WaitForMultipleObjects(nhandles, wait_handles, FALSE,
-					INFINITE)) {
+		switch (WaitForMultipleObjects(3, wait_handles, FALSE, INFINITE)) {
 		case WAIT_OBJECT_0:
 			do {
 				nbytes = monome_event_handle_next(state->monome);
@@ -106,7 +132,7 @@ sosc_event_loop(struct sosc_state *state)
 			break;
 
 		case WAIT_OBJECT_0 + 2:
-			recv_msg(state, state->ipc_in_fd);
+			ResetEvent(wait_handles[2]);
 			break;
 
 		case WAIT_TIMEOUT:
