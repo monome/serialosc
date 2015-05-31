@@ -8,7 +8,10 @@ def build(ctx):
 	if ctx.env.DEST_OS[:3] == "win":
 		ctx.program(
 			features='winres_gen',
-			source='uv.c',
+			source=[
+				'win_svc.c',
+				'uv.c'],
+
 			target=tgt,
 			use='serialosc-common LIBUV LO')
 	else:

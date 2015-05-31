@@ -726,7 +726,11 @@ free_paths(struct sosc_supervisor *self)
 }
 
 int
+#ifdef _WIN32
+supervisor_main(int argc, char **argv)
+#else
 main(int argc, char **argv)
+#endif
 {
 	struct sosc_supervisor self = {NULL};
 
