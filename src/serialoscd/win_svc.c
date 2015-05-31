@@ -41,21 +41,26 @@ control_handler(DWORD ctrl, DWORD type, LPVOID data, LPVOID ctx)
 	case SERVICE_CONTROL_STOP:
 		svc_status.dwWin32ExitCode = 0;
 		svc_status.dwCurrentState  = SERVICE_STOPPED;
-		SetServiceStatus(hstatus, &svc_status);
-		return NO_ERROR;
+		break;
 
 	case SERVICE_CONTROL_INTERROGATE:
-		SetServiceStatus(hstatus, &svc_status);
-		return NO_ERROR;
+		break;
 
 	default:
 		return ERROR_CALL_NOT_IMPLEMENTED;
 	}
+
+	SetServiceStatus(hstatus, &svc_status);
+	return NO_ERROR;
 }
 
 static void WINAPI
 service_main(DWORD argc, LPTSTR *argv)
 {
+	svc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+	svc_status.dwCurrentState = SERVICE_START_PENDING;
+	svc_status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
+
 	hstatus = RegisterServiceCtrlHandlerEx(
 		SOSC_WIN_SERVICE_NAME, control_handler, NULL);
 
