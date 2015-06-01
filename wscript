@@ -137,8 +137,10 @@ def override_find_program(prefix):
 def options(opt):
 	opt.load("compiler_c")
 
-	sosc_opts = opt.add_option_group("serialosc options")
+	xcomp_opts = opt.add_option_group('cross-compilation')
+	xcomp_opts.add_option('--host', action='store', default=False)
 
+	sosc_opts = opt.add_option_group("serialosc options")
 	sosc_opts.add_option("--enable-multilib", action="store_true",
 			default=False, help="on Darwin, build serialosc as a combination 32 and 64 bit executable [disabled by default]")
 	sosc_opts.add_option("--disable-zeroconf", action="store_true",
@@ -149,9 +151,8 @@ def configure(conf):
 	# print() (as a function) ddoesn't work on python <2.7
 	separator = lambda: sys.stdout.write("\n")
 
-	xcomp_prefix = conf.environ.get('CROSS_COMPILE', None)
-	if xcomp_prefix:
-		override_find_program(xcomp_prefix)
+	if conf.options.host:
+		override_find_program(conf.options.host)
 
 	separator()
 	conf.load('compiler_c')
@@ -164,9 +165,10 @@ def configure(conf):
 		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
 		conf.env.append_unique("CFLAGS", conf.env.CPPPATH_ST % conf.env.INCLUDEDIR)
 
+	if conf.options.host:
 		conf.env.append_unique("LIBPATH", conf.env.PREFIX + '/lib')
 		conf.env.append_unique("CFLAGS",
-				conf.env.CPPPATH_ST % conf.env.PREFIX + 'include')
+				conf.env.CPPPATH_ST % conf.env.PREFIX + '/include')
 
 	#
 	# conf checks
