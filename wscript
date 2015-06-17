@@ -108,6 +108,12 @@ def check_dnssd(conf):
 		mandatory=True,
 		header_name="dns_sd.h")
 
+def check_submodules(conf):
+	if not conf.path.find_resource('third-party/libuv/uv.gyp'):
+		raise conf.errors.ConfigurationError(
+			"Submodules aren't initialized!\n"
+			"Make sure you've done `git submodule init && git submodule update`.")
+
 def load_tools(ctx):
 	tooldir = ctx.path.find_dir('waftools').abspath()
 	load_tool = lambda t: ctx.load(t, tooldir=tooldir)
@@ -150,6 +156,8 @@ def configure(conf):
 	# just for output prettifying
 	# print() (as a function) ddoesn't work on python <2.7
 	separator = lambda: sys.stdout.write("\n")
+
+	check_submodules(conf)
 
 	if conf.options.host:
 		override_find_program(conf.options.host)
