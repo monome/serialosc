@@ -49,14 +49,13 @@ def check_poll(conf):
 def check_udev(conf):
 	conf.check_cc(
 		define_name="HAVE_LIBUDEV",
-		mandatory=False,
+		mandatory=True,
 		quote=0,
 
 		lib="udev",
 		uselib_store="UDEV",
 
-		msg="Checking for libudev",
-		errmsg="no (will use sysfs)")
+		msg="Checking for libudev")
 
 def check_liblo(conf):
 	conf.check_cc(
