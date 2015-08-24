@@ -232,9 +232,17 @@ def configure(conf):
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
 	conf.env.VERSION = VERSION
-	conf.env.GIT_COMMIT = subprocess.check_output(
-			["git", "rev-parse", "--verify", "--short", "HEAD"]
-		).decode().strip()
+
+	try:
+		import os
+
+		devnull = open(os.devnull, 'w')
+
+		conf.env.GIT_COMMIT = subprocess.check_output(
+			["git", "rev-parse", "--verify", "--short", "HEAD"],
+			stderr=devnull).decode().strip()
+	except subprocess.CalledProcessError:
+		conf.env.GIT_COMMIT = ''
 
 	conf.define("VERSION", VERSION)
 	conf.define("_GNU_SOURCE", 1)
@@ -248,7 +256,7 @@ def build(bld):
 	bld.recurse("src")
 
 def dist(dst):
-	pats = [".git*", "**/.git*", ".travis.yml"]
+	pats = [".git*", "**/.git*", ".travis.yml", "**/__pycache__"]
 	with open(".gitignore") as gitignore:
 	    for l in gitignore.readlines():
 	        if l[0] == "#":
