@@ -48,6 +48,18 @@ send_connect(const char *devnode)
 	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
+/* we'll be looking for tty devices whose parents'
+ * subsystem is usb-serial to get proper devnodes
+ */
+static int
+has_usb_serial_parent(struct udev_device *ud)
+{
+	if (udev_device_get_parent_with_subsystem_devtype(ud, "usb-serial", NULL))
+		return 1;
+	else
+		return 0;
+}
+
 static monome_t *
 monitor_attach(detector_state_t *state)
 {
@@ -73,7 +85,7 @@ monitor_attach(detector_state_t *state)
 
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
-		if (*(udev_device_get_action(ud)) == 'a')
+		if (*(udev_device_get_action(ud)) == 'a' && has_usb_serial_parent(ud))
 			send_connect(udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
@@ -93,7 +105,6 @@ scan_connected_devices(detector_state_t *state)
 		return 1;
 
 	udev_enumerate_add_match_subsystem(ue, "tty");
-	udev_enumerate_add_match_property(ue, "ID_BUS", "usb");
 	udev_enumerate_scan_devices(ue);
 	cursor = udev_enumerate_get_list_entry(ue);
 
@@ -101,7 +112,7 @@ scan_connected_devices(detector_state_t *state)
 		ud = udev_device_new_from_syspath(
 			state->u, udev_list_entry_get_name(cursor));
 
-		if ((devnode = udev_device_get_devnode(ud)))
+		if (has_usb_serial_parent(ud) && (devnode = udev_device_get_devnode(ud)))
 			send_connect(devnode);
 
 		udev_device_unref(ud);
