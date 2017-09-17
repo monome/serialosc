@@ -725,6 +725,12 @@ free_paths(struct sosc_supervisor *self)
 	s_free(self->device_exe_path);
 }
 
+static void
+print_version(void)
+{
+	printf("serialoscd %s (%s)\n", VERSION, GIT_COMMIT);
+}
+
 int
 #ifdef _WIN32
 supervisor_main(int argc, char **argv)
@@ -732,6 +738,16 @@ supervisor_main(int argc, char **argv)
 main(int argc, char **argv)
 #endif
 {
+	if (argc == 2) {
+		if (argv[1][0] == '-') {
+			switch (argv[1][1]) {
+			case 'v':
+				print_version();
+				return EXIT_SUCCESS;
+			}
+		}
+	}
+
 	struct sosc_supervisor self = {NULL};
 
 	uv_setup_args(argc, argv);
