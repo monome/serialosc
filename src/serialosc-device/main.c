@@ -25,12 +25,6 @@
 
 #include <serialosc/serialosc.h>
 
-static void
-print_version(void)
-{
-	printf("serialosc %s (%s)\n", VERSION, GIT_COMMIT);
-}
-
 int
 main(int argc, char **argv)
 {
@@ -38,14 +32,6 @@ main(int argc, char **argv)
 
 	if (argc < 2)
 		return EXIT_FAILURE;
-
-	if (argv[1][0] == '-') {
-		switch (argv[1][1]) {
-		case 'v':
-			print_version();
-			return EXIT_SUCCESS;
-		}
-	}
 
 	argv[0][strlen(argv[0]) - 1] = ' ';
 
