@@ -80,6 +80,17 @@ def check_libmonome(conf):
 
 		msg="Checking for libmonome")
 
+def check_libuv(conf):
+	conf.check_cc(
+		define_name="HAVE_LIBUV",
+		mandatory=True,
+		quote=0,
+
+		lib="uv",
+		uselib_store="LIBUV",
+
+		msg="Checking for libuv")
+
 def check_strfuncs(ctx):
 	check = lambda func_name: ctx.check_cc(
 			define_name='HAVE_{}'.format(func_name.upper()),
@@ -150,13 +161,13 @@ def options(opt):
 			default=False, help="on Darwin, build serialosc as a combination 32 and 64 bit executable [disabled by default]")
 	sosc_opts.add_option("--disable-zeroconf", action="store_true",
 			default=False, help="disable all zeroconf code, including runtime loading of the DNSSD library.")
+	sosc_opts.add_option("--enable-system-libuv", action="store_true",
+			default=False, help="use libuv provided by the system instead of the included git submodule.")
 
 def configure(conf):
 	# just for output prettifying
 	# print() (as a function) ddoesn't work on python <2.7
 	separator = lambda: sys.stdout.write("\n")
-
-	check_submodules(conf)
 
 	if conf.options.host:
 		override_find_program(conf.options.host)
@@ -191,6 +202,12 @@ def configure(conf):
 
 	check_libmonome(conf)
 	check_liblo(conf)
+
+	conf.env.SOSC_SYSTEM_LIBUV = conf.options.enable_system_libuv
+	if conf.options.enable_system_libuv:
+		check_libuv(conf)
+	else:
+		check_submodules(conf)
 
 	# stuff for libconfuse
 	check_strfuncs(conf)

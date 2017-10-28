@@ -51,7 +51,8 @@ def build_uv(ctx):
 		name='LIBUV')
 
 def build(ctx):
-	build_uv(ctx)
+	if not ctx.env.SOSC_SYSTEM_LIBUV:
+		build_uv(ctx)
 	ctx.recurse('confuse')
 
 # vim: set ts=4 sts=4 noet :
