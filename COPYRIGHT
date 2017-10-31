@@ -15,7 +15,8 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ====
 
-serialosc contains code from libuv.
+When statically linked with libuv, the serialoscd binary also includes code
+under libuv's license:
 
 libuv is part of the Node project: http://nodejs.org/
 libuv may be distributed alone under Node's license:
