@@ -164,7 +164,7 @@ dispatch_ipc_msgs(uv_stream_t *stream, ssize_t nbytes, const uv_buf_t *buf,
 	while (nbytes > 0) {
 		msg_nbytes = sosc_ipc_msg_from_buf(buf_cursor, nbytes, &msg);
 
-		if (nbytes < 0) {
+		if (msg_nbytes < 0) {
 			fprintf(stderr, " [-] bad message, bailing out\n");
 			return;
 		}
