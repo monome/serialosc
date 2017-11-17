@@ -118,7 +118,7 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		.args    = (char *[]) {exe_path, arg, NULL},
 		.flags   = UV_PROCESS_WINDOWS_HIDE,
 
-		.stdio_count = 2,
+		.stdio_count = 3,
 		.stdio = (struct uv_stdio_container_s []) {
 			[STDIN_FILENO] = {
 				.flags       = UV_CREATE_PIPE | UV_READABLE_PIPE,
@@ -128,6 +128,11 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 			[STDOUT_FILENO] = {
 				.flags       = UV_CREATE_PIPE | UV_WRITABLE_PIPE,
 				.data.stream = (void *) &proc->from_proc
+			},
+
+			[STDERR_FILENO] = {
+				.flags       = UV_INHERIT_FD,
+				.data.fd     = STDERR_FILENO
 			}
 		},
 	};
