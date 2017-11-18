@@ -72,64 +72,24 @@ read_strdata(int fd, size_t n, ...)
 	return 0;
 }
 
-static int
-write_strdata(int fd, size_t n, ...)
-{
-	uint16_t magic = IPC_MAGIC;
-	const char *cur;
-	size_t slen;
-	va_list ap;
-
-#define EMIT_BYTES(b, nb)          \
-	do {                           \
-		if (write(fd, b, nb) < nb) \
-			return -1;             \
-	} while (0)
-
-#define EMIT_VAR(v) EMIT_BYTES(&v, sizeof(v))
-
-	va_start(ap, n);
-	while (n--) {
-		cur = va_arg(ap, const char *);
-		slen = strlen(cur);
-
-		EMIT_VAR(slen);
-		EMIT_BYTES(cur, slen);
-		EMIT_VAR(magic);
-	}
-	va_end(ap);
-
-#undef EMIT_VAR
-#undef EMIT_BYTES
-
-	return 0;
-}
-
 int
 sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 {
+	uint8_t buf[64];
 	ssize_t written;
+	ssize_t bufsiz;
 
 	msg->magic = IPC_MAGIC;
 
-	if ((written = write(fd, msg, sizeof(*msg))) < sizeof(*msg))
+	bufsiz = sosc_ipc_msg_to_buf(buf, sizeof(buf), msg);
+
+	if (bufsiz < 0) {
+		fprintf(stderr, "[-] couldn't serialize msg\n");
 		return -1;
-
-	switch (msg->type) {
-	case SOSC_DEVICE_CONNECTION:
-		if (write_strdata(fd, 1, msg->connection.devnode))
-			return -1;
-
-		break;
-
-	case SOSC_DEVICE_INFO:
-		if (write_strdata(fd, 2, msg->device_info.serial,
-		                  msg->device_info.friendly))
-			return -1;
-
-	default:
-		break;
 	}
+
+	if ((written = write(fd, buf, bufsiz)) < bufsiz)
+		return -1;
 
 	return written;
 }
