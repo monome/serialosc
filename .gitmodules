@@ -1,3 +1,6 @@
 [submodule "third-party/libuv"]
 	path = third-party/libuv
 	url = https://github.com/libuv/libuv.git
+[submodule "third-party/optparse"]
+	path = third-party/optparse
+	url = https://github.com/skeeto/optparse
