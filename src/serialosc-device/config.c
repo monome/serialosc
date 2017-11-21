@@ -73,7 +73,7 @@ path_for_serial(const char *serial)
 {
 	char *path, *cdir;
 
-	cdir = sosc_get_config_directory();
+	cdir = sosc_get_default_config_dir();
 	path = s_asprintf("%s/%s.conf", cdir, serial);
 
 	s_free(cdir);

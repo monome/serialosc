@@ -45,7 +45,7 @@ mk_monome_dir(char *cdir)
 }
 
 char *
-sosc_get_config_directory(void)
+sosc_get_default_config_dir(void)
 {
 	char *appdata;
 
@@ -61,7 +61,7 @@ sosc_config_create_directory(void)
 	char *cdir;
 	struct _stat buf[1];
 
-	cdir = sosc_get_config_directory();
+	cdir = sosc_get_default_config_dir();
 	if (_stat(cdir, buf)) {
 		if (mk_monome_dir(cdir))
 			goto err_mkdir;
