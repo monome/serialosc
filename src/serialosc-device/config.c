@@ -69,19 +69,13 @@ prepend_slash_if_necessary(char **dest, char *prefix)
 }
 
 static char *
-path_for_serial(const char *serial)
+path_for_serial(const char *config_dir, const char *serial)
 {
-	char *path, *cdir;
-
-	cdir = sosc_get_default_config_dir();
-	path = s_asprintf("%s/%s.conf", cdir, serial);
-
-	s_free(cdir);
-	return path;
+	return s_asprintf("%s/%s.conf", config_dir, serial);
 }
 
 int
-sosc_config_read(const char *serial, sosc_config_t *config)
+sosc_config_read(const char *config_dir, const char *serial, sosc_config_t *config)
 {
 	cfg_t *cfg, *sec;
 	char *path;
@@ -90,7 +84,12 @@ sosc_config_read(const char *serial, sosc_config_t *config)
 		return 1;
 
 	cfg = cfg_init(opts, CFGF_NOCASE);
-	path = path_for_serial(serial);
+
+	if (config_dir != NULL) {
+		path = path_for_serial(config_dir, serial);
+	} else {
+		path = path_for_serial(sosc_get_default_config_dir(), serial);
+	}
 
 	switch( cfg_parse(cfg, path) ) {
 	case CFG_PARSE_ERROR:
@@ -118,7 +117,7 @@ sosc_config_read(const char *serial, sosc_config_t *config)
 }
 
 int
-sosc_config_write(const char *serial, sosc_state_t *state)
+sosc_config_write(const char *config_dir, const char *serial, sosc_state_t *state)
 {
 	cfg_t *cfg, *sec;
 	char *path;
@@ -130,7 +129,12 @@ sosc_config_write(const char *serial, sosc_state_t *state)
 
 	cfg = cfg_init(opts, CFGF_NOCASE);
 
-	path = path_for_serial(serial);
+	if (config_dir != NULL) {
+		path = path_for_serial(config_dir, serial);
+	} else {
+		path = path_for_serial(sosc_get_default_config_dir(), serial);
+	}
+
 	if (!(f = fopen(path, "w"))) {
 		s_free(path);
 		return 1;

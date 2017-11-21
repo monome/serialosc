@@ -214,7 +214,7 @@ send_osc_port_change(int fd, uint16_t port)
 #endif
 
 void
-sosc_server_run(monome_t *monome)
+sosc_server_run(const char *config_dir, monome_t *monome)
 {
 	char *svc_name;
 	sosc_state_t state = {
@@ -224,7 +224,7 @@ sosc_server_run(monome_t *monome)
 		.ipc_out_fd = (!isatty(STDOUT_FILENO)) ? STDOUT_FILENO : -1
 	};
 
-	if (sosc_config_read(monome_get_serial(state.monome), &state.config)) {
+	if (sosc_config_read(config_dir, monome_get_serial(state.monome), &state.config)) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't read config, using defaults\n",
 			monome_get_serial(state.monome));
@@ -294,7 +294,7 @@ sosc_server_run(monome_t *monome)
 	} else
 		send_simple_ipc(state.ipc_out_fd, SOSC_DEVICE_DISCONNECTION);
 
-	if (sosc_config_write(monome_get_serial(state.monome), &state)) {
+	if (sosc_config_write(config_dir, monome_get_serial(state.monome), &state)) {
 		fprintf(
 			stderr, "serialosc [%s]: couldn't write config :(\n",
 			monome_get_serial(state.monome));
