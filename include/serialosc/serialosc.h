@@ -72,11 +72,11 @@ typedef struct sosc_state {
 } sosc_state_t;
 
 int  sosc_event_loop(struct sosc_state *state);
-void sosc_server_run(monome_t *monome);
+void sosc_server_run(const char *config_dir, monome_t *monome);
 
 int sosc_config_create_directory();
-int sosc_config_read(const char *serial, sosc_config_t *config);
-int sosc_config_write(const char *serial, sosc_state_t *state);
+int sosc_config_read(const char *config_dir, const char *serial, sosc_config_t *config);
+int sosc_config_write(const char *config_dir, const char *serial, sosc_state_t *state);
 
 void sosc_port_itos(char *dest, long int port);
 size_t sosc_strlcpy(char *dst, const char *src, size_t size);

@@ -20,7 +20,7 @@
 #include <serialosc/platform.h>
 
 char *
-sosc_get_config_directory(void)
+sosc_get_default_config_dir(void)
 {
 	return s_asprintf("%s/Library/Preferences/org.monome.serialosc",
 					  getenv("HOME"));
@@ -32,7 +32,7 @@ sosc_config_create_directory(void)
 	struct stat buf[1];
 	char *cdir;
 
-	cdir = sosc_get_config_directory();
+	cdir = sosc_get_default_config_dir();
 
 	if (stat(cdir, buf) && mkdir(cdir, S_IRWXU))
 		goto err_mkdir;

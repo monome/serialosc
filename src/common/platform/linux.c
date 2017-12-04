@@ -20,7 +20,7 @@
 #include <serialosc/platform.h>
 
 char *
-sosc_get_config_directory(void)
+sosc_get_default_config_dir(void)
 {
 	char *dir;
 
@@ -38,7 +38,7 @@ sosc_config_create_directory(void)
 	char *cdir, *xdgdir;
 	struct stat buf[1];
 
-	cdir = sosc_get_config_directory();
+	cdir = sosc_get_default_config_dir();
 
 	if (stat(cdir, buf)) {
 		if (!getenv("XDG_CONFIG_HOME")) {

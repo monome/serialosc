@@ -21,6 +21,9 @@
 
 #include <uv.h>
 #include <wwrl/vector_stdlib.h>
+#define OPTPARSE_IMPLEMENTATION
+#define OPTPARSE_API static
+#include <optparse/optparse.h>
 
 #include <serialosc/serialosc.h>
 #include <serialosc/ipc.h>
@@ -64,6 +67,7 @@ struct sosc_supervisor {
 
 	char *detector_exe_path;
 	char *device_exe_path;
+	char *config_dir;
 
 	struct sosc_subprocess detector;
 
@@ -96,7 +100,7 @@ struct sosc_device_subprocess {
 
 static int
 launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
-		char *exe_path, uv_exit_cb exit_cb, char *arg)
+		char *exe_path, uv_exit_cb exit_cb, char **args)
 {
 	struct uv_process_options_s options;
 	int err;
@@ -115,7 +119,7 @@ launch_subprocess(struct sosc_supervisor *self, struct sosc_subprocess *proc,
 		.exit_cb = exit_cb,
 
 		.file    = exe_path,
-		.args    = (char *[]) {exe_path, arg, NULL},
+		.args    = args,
 		.flags   = UV_PROCESS_WINDOWS_HIDE,
 
 		.stdio_count = 3,
@@ -522,8 +526,18 @@ static int
 device_init(struct sosc_supervisor *self, struct sosc_device_subprocess *dev,
 		char *devnode)
 {
+	char *device_args_config_dir[] = {self->device_exe_path, "-c", self->config_dir, devnode, NULL};
+	char *device_args_no_config_dir[] = {self->device_exe_path, devnode, NULL};
+	char **device_args;
+
+	if (self->config_dir != NULL) {
+		device_args = device_args_config_dir;
+	} else {
+		device_args = device_args_no_config_dir;
+	}
+
 	if (launch_subprocess(self, &dev->subprocess, self->device_exe_path,
-				device_exit_cb, devnode))
+				device_exit_cb, device_args))
 		return -1;
 
 	dev->supervisor = self;
@@ -743,24 +757,44 @@ supervisor_main(int argc, char **argv)
 main(int argc, char **argv)
 #endif
 {
-	if (argc == 2) {
-		if (argv[1][0] == '-') {
-			switch (argv[1][1]) {
-			case 'v':
-				print_version();
-				return EXIT_SUCCESS;
-			}
+	struct sosc_supervisor self = {NULL};
+
+	int opt, longindex;
+	struct optparse options;
+	struct optparse_long longopts[] = {
+		{"config-dir", 'c', OPTPARSE_REQUIRED},
+		{"version", 'v', OPTPARSE_NONE},
+		{0, 0, 0}
+	};
+
+	uv_setup_args(argc, argv);
+	optparse_init(&options, argv);
+
+	while ((opt = optparse_long(&options, longopts, &longindex)) != -1) {
+		switch (opt) {
+		case 'v':
+			print_version();
+			return EXIT_SUCCESS;
+		case 'c':
+			self.config_dir = options.optarg;
+			break;
+		default:
+			fprintf(stderr, "%s: %s\n", argv[0], options.errmsg);
+			return EXIT_FAILURE;
 		}
 	}
 
-	struct sosc_supervisor self = {NULL};
-
-	uv_setup_args(argc, argv);
+	if (options.optind < argc) {
+		fprintf(stderr, "%s: unexpected argument -- %s\n", argv[0], optparse_arg(&options));
+		return EXIT_FAILURE;
+	}
 
 	setvbuf(stdout, NULL, _IONBF, 0);
 	setvbuf(stderr, NULL, _IONBF, 0);
 
-	sosc_config_create_directory();
+	// assuming we won't need to create any explicitly specified config_dir
+	if (self.config_dir == NULL)
+		sosc_config_create_directory();
 
 	if (cache_paths(&self))
 		goto err_cache_paths;

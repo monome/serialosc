@@ -16,7 +16,7 @@
 
 #pragma once
 
-char *sosc_get_config_directory(void);
+char *sosc_get_default_config_dir(void);
 
 char *s_asprintf(const char *fmt, ...);
 void *s_malloc(size_t size);
