@@ -349,6 +349,9 @@ list_devices_walk_cb(uv_handle_t *handle, void *_args)
 
 	dev = container_of(handle, struct sosc_device_subprocess, subprocess.proc);
 
+	if (!dev->ready)
+		return;
+
 	lo_send_from(dst, self->osc.server, LO_TT_IMMEDIATE, "/serialosc/device",
 			"ssi", dev->serial, dev->friendly, dev->port);
 }
