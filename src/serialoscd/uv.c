@@ -246,7 +246,7 @@ write_ipc_msg_to_stream(uv_stream_t *stream, struct sosc_ipc_msg *msg)
 {
 	uv_buf_t uv_buf;
 	uv_write_t *req;
-	uint8_t buf[64];
+	uint8_t buf[SOSC_IPC_MSG_BUFFER_SIZE];
 	ssize_t nbytes;
 
 	nbytes = sosc_ipc_msg_to_buf(buf, sizeof(buf), msg);

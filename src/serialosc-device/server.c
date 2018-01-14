@@ -163,7 +163,7 @@ static void
 send_ipc_msg(sosc_ipc_msg_t *msg)
 {
 	HANDLE p = (HANDLE) _get_osfhandle(STDOUT_FILENO);
-	uint8_t buf[64];
+	uint8_t buf[SOSC_IPC_MSG_BUFFER_SIZE];
 	DWORD written;
 	ssize_t bufsiz;
 

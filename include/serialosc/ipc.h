@@ -18,14 +18,12 @@
 
 #include <stdint.h>
 
-#ifndef PACKED
-#define PACKED __attribute__((__packed__))
-#endif
-
 #ifdef WIN32
 #define SOSC_PIPE_PREFIX "\\\\.\\pipe\\org.monome.serialosc-"
 #define SOSC_DETECTOR_PIPE (SOSC_PIPE_PREFIX "detector")
 #endif
+
+#define SOSC_IPC_MSG_BUFFER_SIZE 256
 
 typedef enum {
 	/* device -> supervisor */
@@ -45,20 +43,20 @@ typedef struct sosc_ipc_msg {
 	__extension__ union {
 		struct {
 			char *devnode;
-		} PACKED connection;
+		} connection;
 
 		struct {
 			char *serial;
 			char *friendly;
-		} PACKED device_info;
+		} device_info;
 
 		struct {
 			uint16_t port;
-		} PACKED port_change;
+		} port_change;
 	};
 
 	uint16_t magic;
-} PACKED sosc_ipc_msg_t;
+} sosc_ipc_msg_t;
 
 int sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg);
 int sosc_ipc_msg_read(int fd, sosc_ipc_msg_t *buf);

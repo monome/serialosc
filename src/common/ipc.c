@@ -75,7 +75,7 @@ read_strdata(int fd, size_t n, ...)
 int
 sosc_ipc_msg_write(int fd, sosc_ipc_msg_t *msg)
 {
-	uint8_t buf[64];
+	uint8_t buf[SOSC_IPC_MSG_BUFFER_SIZE];
 	ssize_t written;
 	ssize_t bufsiz;
 
