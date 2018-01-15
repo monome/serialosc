@@ -42,7 +42,7 @@ struct detector_state {
 static void
 send_connect(const struct detector_state *state, char *port)
 {
-	uint8_t buf[64];
+	uint8_t buf[SOSC_IPC_MSG_BUFFER_SIZE];
 	DWORD written;
 	size_t bufsiz;
 
