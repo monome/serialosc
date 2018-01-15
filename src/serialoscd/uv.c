@@ -277,6 +277,8 @@ static int
 supervisor__change_state(struct sosc_supervisor *self,
 		sosc_supervisor_state_t new_state)
 {
+	char *detector_args[] = {self->detector_exe_path, NULL};
+
 	if (self->state == new_state
 			|| uv_is_active((void *) &self->state_change.check))
 		return -1;
@@ -284,7 +286,7 @@ supervisor__change_state(struct sosc_supervisor *self,
 	switch (new_state) {
 	case SERIALOSC_ENABLED:
 		if (launch_subprocess(self, &self->detector, self->detector_exe_path,
-					detector_exit_cb, NULL))
+					detector_exit_cb, detector_args))
 			return -1;
 
 		self->detector.proc.data = &detector_type;
