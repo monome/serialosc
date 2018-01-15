@@ -237,7 +237,7 @@ handle_device_arrival(struct detector_state *state,
 static LRESULT CALLBACK
 wndproc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam)
 {
-	struct detector_state *state = GetWindowLongPtr(hwnd, GWLP_USERDATA);
+	struct detector_state *state = (struct detector_state *) GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
 	switch (message) {
 	case WM_DESTROY:
