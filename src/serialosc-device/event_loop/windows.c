@@ -127,7 +127,10 @@ sosc_event_loop(struct sosc_state *state)
 			break;
 
 		case WAIT_OBJECT_0 + 1:
-			lo_server_recv_noblock(state->server, 0);
+			do {
+				nbytes = lo_server_recv_noblock(state->server, 0);
+			} while (nbytes > 0);
+
 			WSAResetEvent(wait_handles[1]);
 			break;
 
