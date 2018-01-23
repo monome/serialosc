@@ -10,7 +10,7 @@ out = "build"
 # change this stuff
 
 APPNAME = "serialosc"
-VERSION = "1.4.1"
+VERSION = "1.4.1a"
 
 #
 # dep checking functions
@@ -92,13 +92,22 @@ def check_libuv(conf):
 		msg="Checking for libuv")
 
 def check_strfuncs(ctx):
+	check_strfunc_template = """
+		#include <string.h>
+
+		int main(int argc, char **argv) {{
+			void (*p)();
+			(void)argc; (void)argv;
+			p=(void(*)())({});
+			return !p;
+		}}
+	"""
 	check = lambda func_name: ctx.check_cc(
+			msg='Checking for {}'.format(func_name),
 			define_name='HAVE_{}'.format(func_name.upper()),
 			mandatory=False,
-			quote=0,
-
-			header_name='string.h',
-			function_name=func_name)
+			execute=True,
+			fragment=check_strfunc_template.format(func_name))
 
 	check('strdup')
 	check('_strdup')
