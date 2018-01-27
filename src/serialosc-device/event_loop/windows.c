@@ -74,6 +74,7 @@ sosc_event_loop(struct sosc_state *state)
 {
 	OVERLAPPED ov = {0, 0, {{0, 0}}};
 	HANDLE hres, wait_handles[3];
+	WSANETWORKEVENTS network_events;
 	struct poll_thread_ctx ctx;
 	DWORD evt_mask;
 	ssize_t nbytes;
@@ -127,11 +128,13 @@ sosc_event_loop(struct sosc_state *state)
 			break;
 
 		case WAIT_OBJECT_0 + 1:
+			WSAEnumNetworkEvents(lo_server_get_socket_fd(state->server),
+				wait_handles[1],
+				&network_events);
 			do {
 				nbytes = lo_server_recv_noblock(state->server, 0);
 			} while (nbytes > 0);
 
-			WSAResetEvent(wait_handles[1]);
 			break;
 
 		case WAIT_OBJECT_0 + 2:
