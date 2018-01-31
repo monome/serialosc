@@ -24,6 +24,7 @@
 #include <arpa/inet.h>
 #else
 #include <winsock2.h>
+#include <mswsock.h>
 #endif
 
 #include <lo/lo.h>
@@ -252,6 +253,24 @@ sosc_server_run(const char *config_dir, monome_t *monome)
 			monome_get_serial(state.monome));
 		goto err_svc_name;
 	}
+
+#ifdef WIN32
+	BOOL wsa_ioctl_buf = FALSE;
+	DWORD wsa_ioctl_retbytes;
+	int wsa_ioctl_err;
+
+	/* disable PORT_UNREACHABLE error messages on the server socket */
+	wsa_ioctl_err = WSAIoctl(lo_server_get_socket_fd(state.server),
+		SIO_UDP_CONNRESET,
+		&wsa_ioctl_buf, sizeof(wsa_ioctl_buf),
+		NULL, 0, &wsa_ioctl_retbytes,
+		NULL, NULL);
+
+	if (wsa_ioctl_err == SOCKET_ERROR) {
+		fprintf(stderr, "serialosc [%s]: warning: WSAIoctl failed: %d\n",
+			monome_get_serial(state.monome), WSAGetLastError());
+	}
+#endif
 
 #define HANDLE(ev, cb) monome_register_handler(state.monome, ev, cb, &state)
 	HANDLE(MONOME_BUTTON_DOWN, handle_press);
