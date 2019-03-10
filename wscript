@@ -266,7 +266,7 @@ def configure(conf):
 		conf.env.GIT_COMMIT = subprocess.check_output(
 			["git", "rev-parse", "--verify", "--short", "HEAD"],
 			stderr=devnull).decode().strip()
-	except subprocess.CalledProcessError:
+	except (subprocess.CalledProcessError, OSError):
 		conf.env.GIT_COMMIT = ''
 
 	conf.define("VERSION", VERSION)
