@@ -78,6 +78,7 @@ sosc_event_loop(struct sosc_state *state)
 	struct poll_thread_ctx ctx;
 	DWORD evt_mask;
 	ssize_t nbytes;
+	int status;
 
 	wait_handles[0] = ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
@@ -119,11 +120,12 @@ sosc_event_loop(struct sosc_state *state)
 		switch (WaitForMultipleObjects(3, wait_handles, FALSE, INFINITE)) {
 		case WAIT_OBJECT_0:
 			do {
-				nbytes = monome_event_handle_next(state->monome);
+				status = monome_event_handle_next(state->monome);
 
-				if (nbytes < 0)
+				if (status < 0) {
 					return 1;
-			} while (nbytes > 0);
+				}
+			} while (status > 0);
 
 			break;
 
