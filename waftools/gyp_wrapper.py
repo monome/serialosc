@@ -94,7 +94,7 @@ def target_from_gyp(ctx, path, target):
 		'darwin': 'mac'
 	}
 
-	for clist in (gyp['target_defaults']['conditions'], t['conditions'],
+	for clist in (gyp['variables']['conditions'], t['conditions'],
 			t['direct_dependent_settings']['conditions']):
 		r = eval_condition_list_recursively(clist,
 				OS=os_map[ctx.env.DEST_OS],
