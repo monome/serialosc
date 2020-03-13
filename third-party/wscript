@@ -22,9 +22,9 @@ def build_uv(ctx):
 			'-Wno-maybe-uninitialized',
 			'-Wno-unused-but-set-variable',
 			'-Wno-unused-variable',
-                        '-Wno-cast-function-type',
-                        '-Wno-unknown-pragmas',
-                        '-Wno-return-type',
+			'-Wno-cast-function-type',
+			'-Wno-unknown-pragmas',
+			'-Wno-return-type',
 
 			'-fno-strict-aliasing']
 
