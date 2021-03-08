@@ -256,6 +256,12 @@ def configure(conf):
 
 	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
 
+
+	if conf.env.CC_NAME == "gcc":
+		# FIXME: a poor solution perhaps, it will do for now.
+		# would be better to fix all the relevant signatures.
+		conf.env.append_unique("CFLAGS", ["-Wno-incompatible-pointer-types"])
+
 	conf.env.VERSION = VERSION
 
 	try:
