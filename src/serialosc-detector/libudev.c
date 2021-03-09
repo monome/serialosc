@@ -30,7 +30,6 @@
 #include <serialosc/serialosc.h>
 #include <serialosc/ipc.h>
 
-
 typedef struct {
 	struct udev *u;
 	struct udev_monitor *um;
@@ -60,6 +59,40 @@ has_usb_serial_parent(struct udev_device *ud)
 		return 0;
 }
 
+static int test_cdc_driver(struct udev_device *ud) { 
+	const char *p = udev_device_get_driver(ud);
+	if (!p) return 0;
+	char *drv = strdup(p);
+	int is_cdc = strncmp(drv, "cdc", 3) == 0;
+	free(drv); 
+	return is_cdc;
+}
+
+static int
+has_usb_cdc_parent(struct udev_device *ud) {
+	/// FIXME: this is just a bad hack:
+	/// assuming immediate parent in device tree uses "cdc_acm" driver
+	/// probably broken for hubs!
+	return test_cdc_driver(udev_device_get_parent(ud));
+
+	/// FIXME: should additionally test for monome vendor/model, or serial string
+}
+
+static int
+is_device_compatible(struct udev_device *ud) {
+	int ok = has_usb_serial_parent(ud);
+	if (ok) { 
+		fprintf(stderr, "got usbserial parent\n");
+		return 1;
+	} 
+	ok = has_usb_cdc_parent(ud);
+	if (ok) {
+		fprintf(stderr, "got cdc_acm parent\n");
+		return 1;
+	}
+	return 0;
+}
+
 static monome_t *
 monitor_attach(detector_state_t *state)
 {
@@ -85,7 +118,7 @@ monitor_attach(detector_state_t *state)
 
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
-		if (*(udev_device_get_action(ud)) == 'a' && has_usb_serial_parent(ud))
+		if (*(udev_device_get_action(ud)) == 'a' && is_device_compatible(ud))
 			send_connect(udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
@@ -112,7 +145,7 @@ scan_connected_devices(detector_state_t *state)
 		ud = udev_device_new_from_syspath(
 			state->u, udev_list_entry_get_name(cursor));
 
-		if (has_usb_serial_parent(ud) && (devnode = udev_device_get_devnode(ud)))
+		if (is_device_compatible(ud) && (devnode = udev_device_get_devnode(ud)))
 			send_connect(devnode);
 
 		udev_device_unref(ud);

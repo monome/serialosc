@@ -172,6 +172,8 @@ def options(opt):
 			default=False, help="disable all zeroconf code, including runtime loading of the DNSSD library.")
 	sosc_opts.add_option("--enable-system-libuv", action="store_true",
 			default=False, help="use libuv provided by the system instead of the included git submodule.")
+	sosc_opts.add_option('--enable-debug', action='store_true',
+			default=False, help="Build debuggable binaries")
 
 def configure(conf):
 	# just for output prettifying
@@ -254,13 +256,18 @@ def configure(conf):
 		conf.define("SOSC_NO_ZEROCONF", True)
 		conf.env.SOSC_NO_ZEROCONF = True
 
-	conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror"])
+
+	if conf.options.enable_debug:
+		conf.env.append_unique("CFLAGS", ["-std=c99",  "-Wall", "-g", "-Og"])
+	else:
+		conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror", "-O2"])
 
 
 	if conf.env.CC_NAME == "gcc":
 		# FIXME: a poor solution perhaps, it will do for now.
 		# would be better to fix all the relevant signatures.
 		conf.env.append_unique("CFLAGS", ["-Wno-incompatible-pointer-types"])
+
 
 	conf.env.VERSION = VERSION
 
