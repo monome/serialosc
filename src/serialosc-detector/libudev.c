@@ -47,9 +47,6 @@ send_connect(const char *devnode)
 	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
-/* we'll be looking for tty devices whose parents'
- * subsystem is usb-serial to get proper devnodes
- */
 static int
 has_usb_serial_parent(struct udev_device *ud)
 {
@@ -59,20 +56,75 @@ has_usb_serial_parent(struct udev_device *ud)
 		return 0;
 }
 
-static int test_cdc_driver(struct udev_device *ud) { 
+static char
+test_cdc_driver(struct udev_device *ud) { 
 	const char *p = udev_device_get_driver(ud);
 	if (!p) return 0;
 	char *drv = strdup(p);
-	int is_cdc = strncmp(drv, "cdc", 3) == 0;
+	char is_cdc = strncmp(drv, "cdc", 3) == 0;
 	free(drv); 
 	return is_cdc;
 }
 
-static int
+static char
+test_monome_props(struct udev_device *ud)
+{
+	char *vendor, *model;
+	const char *tmp;
+	tmp = udev_device_get_property_value(ud, "ID_VENDOR");
+	if (!tmp) return 0;
+
+	vendor = strdup(tmp);
+
+	tmp = udev_device_get_property_value(ud, "ID_MODEL");
+	if (!tmp) { 
+		free(vendor);
+		return 0;
+	}
+
+	model = strdup(tmp);
+
+	printf("vendor: %s; model: %s\n\n", vendor, model);
+
+	char res = 0;
+	if (vendor != NULL && model != NULL) { 
+		res = (strcmp(vendor,"monome")==0) && (strcmp(model,"grid")==0);
+	}
+
+	free(model);
+	free(vendor);
+	return res;
+}
+
+
+static char
+test_monome_serial(struct udev_device *ud)
+{
+	const char *tmp;
+	char *serial;
+	int num;
+
+	char res = 0;
+	// search pattern for mext clones
+	static const char match[] = "m%d";
+
+	tmp = udev_device_get_property_value(ud, "ID_SERIAL_SHORT");
+	if (!tmp) return 0;
+	
+	serial = strdup(tmp);
+	printf("serial: %s;\n", serial);
+	if( sscanf(serial, match, &num) )
+		res = 1;
+
+	free(serial);
+	return res;
+}
+
+
+static char
 has_usb_cdc_parent(struct udev_device *ud) {
 	/// FIXME: this is just a bad hack:
 	/// assuming immediate parent in device tree uses "cdc_acm" driver
-	/// probably broken for hubs!
 	return test_cdc_driver(udev_device_get_parent(ud));
 
 	/// FIXME: should additionally test for monome vendor/model, or serial string
@@ -82,12 +134,21 @@ static int
 is_device_compatible(struct udev_device *ud) {
 	int ok = has_usb_serial_parent(ud);
 	if (ok) { 
-		fprintf(stderr, "got usbserial parent\n");
+		fprintf(stderr, "USB-serial device; OK\n");
 		return 1;
 	} 
 	ok = has_usb_cdc_parent(ud);
-	if (ok) {
-		fprintf(stderr, "got cdc_acm parent\n");
+	if (!ok) {
+		return 0;
+	}
+	ok = test_monome_props(ud);
+	if (ok) { 
+		fprintf(stderr, "CDC device with monome properties; OK\n");
+		return 1;
+	}
+	ok = test_monome_serial(ud);
+	if (ok) { 
+		fprintf(stderr, "CDC device with monome serial pattern; OK\n");
 		return 1;
 	}
 	return 0;
