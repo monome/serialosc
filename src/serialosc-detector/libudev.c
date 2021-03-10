@@ -123,11 +123,9 @@ test_monome_serial(struct udev_device *ud)
 
 static char
 has_usb_cdc_parent(struct udev_device *ud) {
-	/// FIXME: this is just a bad hack:
+	/// FIXME: pretty bad hack:
 	/// assuming immediate parent in device tree uses "cdc_acm" driver
 	return test_cdc_driver(udev_device_get_parent(ud));
-
-	/// FIXME: should additionally test for monome vendor/model, or serial string
 }
 
 static int
