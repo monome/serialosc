@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
 #include <winsock2.h>
 #include <windows.h>
@@ -24,11 +25,13 @@
 #include <winreg.h>
 #include <dbt.h>
 #include <io.h>
+#include <setupapi.h>
 
 #include <serialosc/serialosc.h>
 #include <serialosc/ipc.h>
 
-#define FTDI_REG_PATH "SYSTEM\\CurrentControlSet\\Enum\\FTDIBUS"
+static GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
+	{0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73}};
 
 struct detector_state {
 	HANDLE to_supervisor;
@@ -66,124 +69,57 @@ send_connect(const struct detector_state *state, char *port)
 	WriteFile(state->to_supervisor, buf, bufsiz, &written, NULL);
 }
 
-static int
-scan_connected_devices(const struct detector_state *state)
-{
-	HKEY key, subkey;
-	char subkey_name[MAX_PATH], *subkey_path;
-	unsigned char port_name[64];
-	DWORD klen, plen, ptype;
-	int i = 0;
-
-	switch (RegOpenKeyEx(HKEY_LOCAL_MACHINE, FTDI_REG_PATH,
-			0, KEY_READ, &key)) {
-	case ERROR_SUCCESS:
-		/* ERROR: request was (unexpectedly) successful */
-		break;
-
-	case ERROR_FILE_NOT_FOUND:
-		/* print message about needing the FTDI driver maybe? */
-		/* fall through also */
-	default:
-		return 1;
-	}
-
-	for (;;) {
-		klen = sizeof(subkey_name) / sizeof(char);
-
-		switch (RegEnumKeyEx(key, i++, subkey_name, &klen,
-					NULL, NULL, NULL, NULL)) {
-		case ERROR_MORE_DATA:
-		case ERROR_SUCCESS:
-			break;
-
-		default:
-			goto done;
-		}
-
-		subkey_path = s_asprintf("%s\\%s\\0000\\Device Parameters",
-				FTDI_REG_PATH, subkey_name);
-
-		switch (RegOpenKeyEx(HKEY_LOCAL_MACHINE, subkey_path,
-					0, KEY_READ, &subkey)) {
-		case ERROR_SUCCESS:
-			break;
-
-		default:
-			free(subkey_path);
-			continue;
-		}
-
-		free(subkey_path);
-
-		plen = sizeof(port_name) / sizeof(char);
-		ptype = REG_SZ;
-		switch (RegQueryValueEx(subkey, "PortName", 0, &ptype,
-					port_name, &plen)) {
-		case ERROR_SUCCESS:
-			port_name[plen] = '\0';
-			break;
-
-		default:
-			goto next;
-		}
-
-		send_connect(state, (char *) port_name);
-
-next:
-		RegCloseKey(subkey);
-	}
-
-done:
-	RegCloseKey(key);
-	return 0;
-}
-
-static int
-ftdishit_to_port(char *dst, size_t dst_size, const char *bullshit)
-{
-	char *subkey_path, *port;
+static bool
+get_device_port_name(char *dst, size_t dst_size, HDEVINFO hdevinfo, SP_DEVINFO_DATA *devinfo) {
 	DWORD plen, ptype;
-	HKEY subkey;
-
-	if (!(bullshit = strchr(bullshit, '#')))
-		return -1;
-
-	if (!(port = strchr(++bullshit, '#')))
-		return -1;
-
-	*port = '\0';
-
-	subkey_path = s_asprintf(FTDI_REG_PATH "\\%s\\0000\\Device Parameters",
-	                         bullshit);
-
-	switch (RegOpenKeyEx(
-	        HKEY_LOCAL_MACHINE, subkey_path,
-	        0, KEY_READ, &subkey)) {
-	case ERROR_SUCCESS:
-		break;
-
-	default:
-		free(subkey_path);
-		return -1;
-	}
-
-	free(subkey_path);
+	HKEY hkey;
+	LSTATUS status;
 
 	plen = dst_size;
 	ptype = REG_SZ;
-	switch (RegQueryValueEx(subkey, "PortName", 0, &ptype,
-	                        (unsigned char *) dst, &plen)) {
-	case ERROR_SUCCESS:
-		dst[plen] = '\0';
-		break;
 
-	default:
-		RegCloseKey(subkey);
-		return -1;
+	hkey = SetupDiOpenDevRegKey(hdevinfo, devinfo, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+	status = RegQueryValueEx(hkey, "PortName", NULL, &ptype, (unsigned char *) dst, &plen);
+
+	if (status == ERROR_SUCCESS) {
+		dst[plen] = '\0';
+
+		RegCloseKey(hkey);
+		return true;
 	}
 
-	RegCloseKey(subkey);
+	RegCloseKey(hkey);
+	return false;
+}
+
+
+static int
+scan_connected_devices(const struct detector_state *state)
+{
+	HDEVINFO hdevinfo;
+	SP_DEVINFO_DATA devinfo;
+	int di;
+
+	hdevinfo = SetupDiGetClassDevs(&vcp_guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+
+	if (hdevinfo == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "serialosc: SetupDiGetClassDevs() failed.\n");
+		return 1;
+	}
+
+	devinfo.cbSize = sizeof(SP_DEVINFO_DATA);
+	di = 0;
+
+	while (SetupDiEnumDeviceInfo(hdevinfo, di, &devinfo)) {
+		char port_name[64];
+
+		if (get_device_port_name(port_name, sizeof(port_name), hdevinfo, &devinfo)) {
+			send_connect(state, (char *) port_name);
+		}
+
+		di++;
+	}
+
 	return 0;
 }
 
@@ -191,11 +127,9 @@ static int
 init_device_notification(struct detector_state *state)
 {
 	DEV_BROADCAST_DEVICEINTERFACE filter;
-	GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
-		{0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73}};
 
 	filter.dbcc_size = sizeof(filter);
-	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+	filter.dbcc_devicetype = DBT_DEVTYP_PORT;
 	filter.dbcc_reserved = 0;
 	filter.dbcc_classguid = vcp_guid;
 	filter.dbcc_name[0] = '\0';
@@ -218,20 +152,17 @@ static void
 handle_device_arrival(struct detector_state *state,
 		DEV_BROADCAST_DEVICEINTERFACE *dev)
 {
-	char devname[256], port[64];
+	char port_name[64];
+	DEV_BROADCAST_PORT *dev_port;
 
-	/* XXX: we could theoretically rip out all this FTDI-specific nonsense
-	 *      and just get port notifications, but win32 libmonome only knows
-	 *      how to get serial numbers from FTDI devices anyway so there's
-	 *      no real win for that change. */
-	if (dev->dbcc_devicetype != DBT_DEVTYP_DEVICEINTERFACE)
+	if (dev->dbcc_devicetype != DBT_DEVTYP_PORT)
 		return;
 
-	wcstombs(devname, (void *) dev->dbcc_name, sizeof(devname));
-	if (ftdishit_to_port(port, sizeof(port), devname))
-		return;
+	dev_port = (DEV_BROADCAST_PORT *) dev;
 
-	send_connect(state, port);
+	wcstombs(port_name, (void *) dev_port->dbcp_name, sizeof(port_name));
+
+	send_connect(state, port_name);
 }
 
 static LRESULT CALLBACK

@@ -191,6 +191,7 @@ def configure(conf):
 
 		conf.env.append_unique("LIBPATH", conf.env.LIBDIR)
 		conf.env.append_unique("CFLAGS", conf.env.CPPPATH_ST % conf.env.INCLUDEDIR)
+		conf.env.append_unique("LIB", ['setupapi'])
 
 	if conf.options.host:
 		conf.env.append_unique("LIBPATH", conf.env.PREFIX + '/lib')
