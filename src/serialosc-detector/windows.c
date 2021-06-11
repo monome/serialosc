@@ -26,12 +26,12 @@
 #include <dbt.h>
 #include <io.h>
 #include <setupapi.h>
+#include <initguid.h>
 
 #include <serialosc/serialosc.h>
 #include <serialosc/ipc.h>
 
-static GUID vcp_guid = {0x86e0d1e0L, 0x8089, 0x11d0,
-	{0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73}};
+DEFINE_GUID(GUID_DEVINTERFACE_COMPORT, 0x86e0d1e0L, 0x8089, 0x11d0, 0x9c, 0xe4, 0x08, 0x00, 0x3e, 0x30, 0x1f, 0x73);
 
 struct detector_state {
 	HANDLE to_supervisor;
@@ -100,7 +100,7 @@ scan_connected_devices(const struct detector_state *state)
 	SP_DEVINFO_DATA devinfo;
 	int di;
 
-	hdevinfo = SetupDiGetClassDevs(&vcp_guid, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+	hdevinfo = SetupDiGetClassDevs(&GUID_DEVINTERFACE_COMPORT, NULL, NULL, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
 
 	if (hdevinfo == INVALID_HANDLE_VALUE) {
 		fprintf(stderr, "serialosc: SetupDiGetClassDevs() failed.\n");
@@ -131,7 +131,7 @@ init_device_notification(struct detector_state *state)
 	filter.dbcc_size = sizeof(filter);
 	filter.dbcc_devicetype = DBT_DEVTYP_PORT;
 	filter.dbcc_reserved = 0;
-	filter.dbcc_classguid = vcp_guid;
+	filter.dbcc_classguid = GUID_DEVINTERFACE_COMPORT;
 	filter.dbcc_name[0] = '\0';
 
 	state->ftdi_notify = RegisterDeviceNotification(state->msg_window,
