@@ -10,7 +10,7 @@ out = "build"
 # change this stuff
 
 APPNAME = "serialosc"
-VERSION = "1.4.1a"
+VERSION = "1.4.3"
 
 #
 # dep checking functions
