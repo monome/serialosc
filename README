@@ -12,6 +12,5 @@
    messages to and from your monome.  it
    also advertises a _monome-osc._udp
    service over zeroconf (bonjour).
-
-                             wrl@illest.net
-
+   
+   see https://monome.org/docs/serialosc/setup
