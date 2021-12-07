@@ -54,7 +54,9 @@ send_connect(const char *devnode)
 static int
 has_usb_serial_parent(struct udev_device *ud)
 {
-	if (udev_device_get_parent_with_subsystem_devtype(ud, "usb", NULL))
+	if (udev_device_get_parent_with_subsystem_devtype(ud, "usb_serial", NULL))
+		return 1;
+	else if (udev_device_get_parent_with_subsystem_devtype(ud, "usb", NULL))
 		return 1;
 	else
 		return 0;
