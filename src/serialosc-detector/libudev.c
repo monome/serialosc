@@ -30,7 +30,6 @@
 #include <serialosc/serialosc.h>
 #include <serialosc/ipc.h>
 
-
 typedef struct {
 	struct udev *u;
 	struct udev_monitor *um;
@@ -48,9 +47,6 @@ send_connect(const char *devnode)
 	sosc_ipc_msg_write(STDOUT_FILENO, &msg);
 }
 
-/* we'll be looking for tty devices whose parents'
- * subsystem is usb-serial to get proper devnodes
- */
 static int
 has_usb_serial_parent(struct udev_device *ud)
 {
@@ -58,6 +54,93 @@ has_usb_serial_parent(struct udev_device *ud)
 		return 1;
 	else
 		return 0;
+}
+
+static char
+test_cdc_driver(struct udev_device *ud) { 
+	const char *p = udev_device_get_driver(ud);
+	if (!p) return 0;
+	char *drv = strdup(p);
+	char is_cdc = strncmp(drv, "cdc", 3) == 0;
+	free(drv); 
+	return is_cdc;
+}
+
+static char
+test_monome_props(struct udev_device *ud)
+{
+	char *vendor, *model;
+	const char *tmp;
+	tmp = udev_device_get_property_value(ud, "ID_VENDOR");
+	if (!tmp) return 0;
+
+	vendor = strdup(tmp);
+
+	tmp = udev_device_get_property_value(ud, "ID_MODEL");
+	if (!tmp) { 
+		free(vendor);
+		return 0;
+	}
+
+	model = strdup(tmp);
+
+	char res = 0;
+	if (vendor != NULL && model != NULL) { 
+		res = (strcmp(vendor, "monome") == 0) && (strcmp(model, "grid") == 0);
+	}
+
+	free(model);
+	free(vendor);
+	return res;
+}
+
+
+static char
+test_monome_serial(struct udev_device *ud)
+{
+	const char *tmp;
+	char *serial;
+	int num;
+
+	char res = 0;
+	// search pattern for mext clones
+	static const char match[] = "m%d";
+
+	tmp = udev_device_get_property_value(ud, "ID_SERIAL_SHORT");
+	if (!tmp) return 0;
+	
+	serial = strdup(tmp);
+
+	if (sscanf(serial, match, &num))
+		res = 1;
+
+	free(serial);
+	return res;
+}
+
+
+static char
+has_usb_cdc_parent(struct udev_device *ud) {
+	/// FIXME: pretty bad hack:
+	/// assuming immediate parent in device tree uses "cdc_acm" driver
+	return test_cdc_driver(udev_device_get_parent(ud));
+}
+
+static int
+is_device_compatible(struct udev_device *ud) {
+	if (has_usb_serial_parent(ud)) { 
+		return 1;
+	} 
+	if (!has_usb_cdc_parent(ud)) {
+		return 0;
+	}
+	if (test_monome_props(ud)) { 
+		return 1;
+	}
+	if (test_monome_serial(ud)) { 
+		return 1;
+	}
+	return 0;
 }
 
 static monome_t *
@@ -85,7 +168,7 @@ monitor_attach(detector_state_t *state)
 
 		/* check if this was an add event.
 		   "add"[0] == 'a' */
-		if (*(udev_device_get_action(ud)) == 'a' && has_usb_serial_parent(ud))
+		if (*(udev_device_get_action(ud)) == 'a' && is_device_compatible(ud))
 			send_connect(udev_device_get_devnode(ud));
 
 		udev_device_unref(ud);
@@ -112,7 +195,7 @@ scan_connected_devices(detector_state_t *state)
 		ud = udev_device_new_from_syspath(
 			state->u, udev_list_entry_get_name(cursor));
 
-		if (has_usb_serial_parent(ud) && (devnode = udev_device_get_devnode(ud)))
+		if (is_device_compatible(ud) && (devnode = udev_device_get_devnode(ud)))
 			send_connect(devnode);
 
 		udev_device_unref(ud);
