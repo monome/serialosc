@@ -84,8 +84,6 @@ test_monome_props(struct udev_device *ud)
 
 	model = strdup(tmp);
 
-	printf("vendor: %s; model: %s\n\n", vendor, model);
-
 	char res = 0;
 	if (vendor != NULL && model != NULL) { 
 		res = (strcmp(vendor, "monome") == 0) && (strcmp(model, "grid") == 0);
@@ -112,7 +110,7 @@ test_monome_serial(struct udev_device *ud)
 	if (!tmp) return 0;
 	
 	serial = strdup(tmp);
-	printf("serial: %s;\n", serial);
+
 	if( sscanf(serial, match, &num) )
 		res = 1;
 
@@ -132,7 +130,6 @@ static int
 is_device_compatible(struct udev_device *ud) {
 	int ok = has_usb_serial_parent(ud);
 	if (ok) { 
-		fprintf(stderr, "USB-serial device; OK\n");
 		return 1;
 	} 
 	ok = has_usb_cdc_parent(ud);
@@ -141,12 +138,10 @@ is_device_compatible(struct udev_device *ud) {
 	}
 	ok = test_monome_props(ud);
 	if (ok) { 
-		fprintf(stderr, "CDC device with monome properties; OK\n");
 		return 1;
 	}
 	ok = test_monome_serial(ud);
 	if (ok) { 
-		fprintf(stderr, "CDC device with monome serial pattern; OK\n");
 		return 1;
 	}
 	return 0;
