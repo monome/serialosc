@@ -88,7 +88,7 @@ test_monome_props(struct udev_device *ud)
 
 	char res = 0;
 	if (vendor != NULL && model != NULL) { 
-		res = (strcmp(vendor,"monome")==0) && (strcmp(model,"grid")==0);
+		res = (strcmp(vendor, "monome") == 0) && (strcmp(model, "grid") == 0);
 	}
 
 	free(model);
