@@ -111,7 +111,7 @@ test_monome_serial(struct udev_device *ud)
 	
 	serial = strdup(tmp);
 
-	if( sscanf(serial, match, &num) )
+	if (sscanf(serial, match, &num))
 		res = 1;
 
 	free(serial);
