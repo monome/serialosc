@@ -128,20 +128,16 @@ has_usb_cdc_parent(struct udev_device *ud) {
 
 static int
 is_device_compatible(struct udev_device *ud) {
-	int ok = has_usb_serial_parent(ud);
-	if (ok) { 
+	if (has_usb_serial_parent(ud)) { 
 		return 1;
 	} 
-	ok = has_usb_cdc_parent(ud);
-	if (!ok) {
+	if (!has_usb_cdc_parent(ud)) {
 		return 0;
 	}
-	ok = test_monome_props(ud);
-	if (ok) { 
+	if (test_monome_props(ud)) { 
 		return 1;
 	}
-	ok = test_monome_serial(ud);
-	if (ok) { 
+	if (test_monome_serial(ud)) { 
 		return 1;
 	}
 	return 0;
