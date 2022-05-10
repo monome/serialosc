@@ -4,3 +4,6 @@
 [submodule "third-party/optparse"]
 	path = third-party/optparse
 	url = https://github.com/skeeto/optparse
+[submodule "libmonome"]
+	path = libmonome
+	url = https://github.com/monome/libmonome
