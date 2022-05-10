@@ -32,6 +32,10 @@ def build_uv(ctx):
 				for x in from_gyp['libraries']]
 	elif ctx.env.DEST_OS == 'darwin':
 		from_gyp['ldflags'].remove('-pthread')
+	if ctx.env.DEST_OS == 'linux':
+		extra_cflags += [
+			'-Wno-sign-compare'
+		]
 
 	ctx.env.append_unique('LINKFLAGS_UV_FLAGS', from_gyp['ldflags'])
 	ctx.env.append_unique('LIB_UV_FLAGS', from_gyp['libraries'])
