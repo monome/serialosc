@@ -1,0 +1,8 @@
+[Unit]
+Description=osc server for monome devices
+
+[Service]
+ExecStart=/usr/bin/serialoscd
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,22 @@
+set -e
+
+export PREFIX=/usr
+
+cd libmonome
+./waf configure --prefix=${PREFIX}
+./waf install
+
+cd ..
+env LDFLAGS=-L${DESTDIR}/${PREFIX}/lib64 CFLAGS=-I${DESTDIR}/${PREFIX}/include ./waf configure --prefix=${PREFIX} --disable-zeroconf
+./waf install
+
+mkdir -p ${DESTDIR}/${PREFIX}/lib/systemd/system/
+cp data/serialosc.service ${DESTDIR}/${PREFIX}/lib/systemd/system/
+
+mkdir -p "$DESTDIR"/etc
+cp /usr/lib/os-release "$DESTDIR"/etc/os-release
+cat >> "$DESTDIR"/etc/os-release <<EOF
+PORTABLE_PRETTY_NAME="serialosc portable service"
+EOF
+
+touch "$DESTDIR"/etc/resolv.conf

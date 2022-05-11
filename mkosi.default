@@ -1,0 +1,15 @@
+[Distribution]
+Distribution=fedora
+Release=35
+
+[Packages]
+BuildPackages=
+    gcc
+    git
+    liblo-devel
+    python-unversioned-command
+    python3
+    systemd-devel
+
+Packages=
+    liblo
