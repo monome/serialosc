@@ -27,7 +27,9 @@ cd libmonome
 ./waf configure
 ./waf
 sudo ./waf install
+cd ..
 git clone git@github.com:monome/serialosc.git
+cd serialosc
 ./waf configure
 ./waf
 sudo ./waf install
