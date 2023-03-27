@@ -12,9 +12,23 @@ see [releases](https://github.com/monome/serialosc/releases) for mac and windows
 
 ## build
 
+
 ```
 ./waf configure
 ./waf
 sudo ./waf install
 ```
 
+all steps
+```
+sudo apt-get install git build-essential liblo-dev libudev-dev libusb-1.0 libusb-dev
+git clone git@github.com:monome/libmonome.git
+cd libmonome
+./waf configure
+./waf
+sudo ./waf install
+git clone git@github.com:monome/serialosc.git
+./waf configure
+./waf
+sudo ./waf install
+```
