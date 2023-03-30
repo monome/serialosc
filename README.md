@@ -21,16 +21,20 @@ sudo ./waf install
 
 all steps
 ```
-sudo apt-get install git build-essential liblo-dev libudev-dev libusb-1.0 libusb-dev
-git clone git@github.com:monome/libmonome.git
+sudo apt-get install liblo-dev
+git clone https://github.com/monome/libmonome.git
 cd libmonome
 ./waf configure
 ./waf
 sudo ./waf install
 cd ..
-git clone git@github.com:monome/serialosc.git
+
+sudo apt-get install libudev-dev libavahi-compat-libdnssd-dev libuv1-dev
+git clone https://github.com/monome/serialosc.git
 cd serialosc
-./waf configure
+git submodule init && git submodule update
+./waf configure --enable-system-libuv
 ./waf
 sudo ./waf install
+cd ..
 ```
