@@ -38,3 +38,9 @@ git submodule init && git submodule update
 sudo ./waf install
 cd ..
 ```
+
+## preference file locations
+
+- linux: `$XDG_CONFIG_HOME/serialosc` or `$HOME/.config/serialosc`
+- macos: `~/Library/Preferences/org.monome.serialosc`
+- windows: `$APPDATA\\Monome\\serialosc`
