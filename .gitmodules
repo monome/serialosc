@@ -4,3 +4,9 @@
 [submodule "third-party/optparse"]
 	path = third-party/optparse
 	url = https://github.com/skeeto/optparse
+[submodule "third-party/libmonome"]
+	path = third-party/libmonome
+	url = https://github.com/monome/libmonome.git
+[submodule "third-party/liblo"]
+	path = third-party/liblo
+	url = https://github.com/radarsat1/liblo.git

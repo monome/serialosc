@@ -64,3 +64,22 @@ The externally maintained libraries used by libuv are:
   - android-ifaddrs.h, android-ifaddrs.c, copyright Berkeley Software Design
     Inc, Kenneth MacKay and Emergya (Cloud4all, FP7/2007-2013, grant agreement
     n° 289016). Three clause BSD license.
+
+====
+
+When statically linked with liblo, the serialoscd and serialosc-device binaries
+also include code under liblo's license:
+
+Copyright (C) 2014 Steve Harris et al.
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+liblo license: https://github.com/radarsat1/liblo/blob/master/COPYING
