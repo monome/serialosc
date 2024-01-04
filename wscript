@@ -287,10 +287,7 @@ def configure(conf):
 	conf.define("_GNU_SOURCE", 1)
 	conf.define("GIT_COMMIT", conf.env.GIT_COMMIT)
 
-	conf.write_config_header("config-autogen.h", remove=False)
-
 def build(bld):
-	bld.get_config_header("config-autogen.h")
 	bld.recurse("third-party")
 	bld.recurse("src")
 
