@@ -15,6 +15,7 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #include <winsock2.h>
 #include <windows.h>
@@ -69,6 +70,29 @@ stdin_poll_thread(LPVOID _ctx)
 	return 0;
 }
 
+static bool
+wait_for_serial_input(HANDLE file, LPOVERLAPPED ov)
+{
+	DWORD evt_mask;
+
+	SetCommMask(file, EV_RXCHAR);
+
+	if (!WaitCommEvent(file, &evt_mask, ov)) {
+		switch (GetLastError()) {
+		case ERROR_IO_PENDING:
+			break;
+		/* evidently we get this when the monome is unplugged? */
+		case ERROR_ACCESS_DENIED:
+			return false;
+		default:
+			fprintf(stderr, "wait_for_serial_input() error: %"PRIdword"\n", GetLastError());
+			return false;
+		}
+	}
+
+	return true;
+}
+
 int
 sosc_event_loop(struct sosc_state *state)
 {
@@ -76,7 +100,6 @@ sosc_event_loop(struct sosc_state *state)
 	HANDLE hres, wait_handles[3];
 	WSANETWORKEVENTS network_events;
 	struct poll_thread_ctx ctx;
-	DWORD evt_mask;
 	ssize_t nbytes;
 	int status;
 
@@ -99,24 +122,11 @@ sosc_event_loop(struct sosc_state *state)
 
 	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
 
+	if (!wait_for_serial_input(hres, &ov)) {
+		return 1;
+	}
+
 	while (state->running) {
-		SetCommMask(hres, EV_RXCHAR);
-
-		if (!WaitCommEvent(hres, &evt_mask, &ov))
-			switch (GetLastError()) {
-			case ERROR_IO_PENDING:
-				break;
-
-			case ERROR_ACCESS_DENIED:
-				/* evidently we get this when the monome is unplugged? */
-				return 1;
-
-			default:
-				fprintf(stderr, "event_loop() error: %"PRIdword"\n",
-						GetLastError());
-				return 1;
-			}
-
 		switch (WaitForMultipleObjects(3, wait_handles, FALSE, INFINITE)) {
 		case WAIT_OBJECT_0:
 			do {
@@ -126,6 +136,11 @@ sosc_event_loop(struct sosc_state *state)
 					return 1;
 				}
 			} while (status > 0);
+
+			// reset the event and wait for more input
+			if (!wait_for_serial_input(hres, &ov)) {
+				return 1;
+			}
 
 			break;
 
