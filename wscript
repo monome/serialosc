@@ -10,7 +10,7 @@ out = "build"
 # change this stuff
 
 APPNAME = "serialosc"
-VERSION = "1.4.3"
+VERSION = "1.4.4"
 
 #
 # dep checking functions
@@ -128,7 +128,7 @@ def check_dnssd(conf):
 		header_name="dns_sd.h")
 
 def check_submodules(conf):
-	if not conf.path.find_resource('third-party/libuv/uv.gyp'):
+	if not conf.path.find_resource('third-party/optparse/optparse.h'):
 		raise conf.errors.ConfigurationError(
 			"Submodules aren't initialized!\n"
 			"Make sure you've done `git submodule init && git submodule update`.")
@@ -137,7 +137,6 @@ def load_tools(ctx):
 	tooldir = ctx.path.find_dir('waftools').abspath()
 	load_tool = lambda t: ctx.load(t, tooldir=tooldir)
 
-	load_tool('gyp_wrapper')
 	load_tool('winres_gen')
 
 def override_find_program(prefix):
@@ -170,8 +169,6 @@ def options(opt):
 			default=False, help="on Darwin, build serialosc as a combination 32 and 64 bit executable [disabled by default]")
 	sosc_opts.add_option("--disable-zeroconf", action="store_true",
 			default=False, help="disable all zeroconf code, including runtime loading of the DNSSD library.")
-	sosc_opts.add_option("--enable-system-libuv", action="store_true",
-			default=False, help="use libuv provided by the system instead of the included git submodule.")
 	sosc_opts.add_option('--enable-debug', action='store_true',
 			default=False, help="Build debuggable binaries")
 
@@ -215,11 +212,8 @@ def configure(conf):
 	check_libmonome(conf)
 	check_liblo(conf)
 
-	conf.env.SOSC_SYSTEM_LIBUV = conf.options.enable_system_libuv
-	if conf.options.enable_system_libuv:
-		check_libuv(conf)
-	else:
-		check_submodules(conf)
+	check_libuv(conf)
+	check_submodules(conf)
 
 	# stuff for libconfuse
 	check_strfuncs(conf)
