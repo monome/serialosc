@@ -33,6 +33,34 @@ include_directories(include)
 include_directories(third-party/liblo)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/third-party/liblo/cmake)
 
+message(STATUS "checking git commit id")
+execute_process(COMMAND "git" "rev-parse" "--verify" "--short" "HEAD" RESULT_VARIABLE GIT_COMMIT_RESULT OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+if(NOT GIT_COMMIT_RESULT EQUAL 0)
+    set(GIT_COMMIT "unknown")
+endif()
+
+message(STATUS "checking git commit id - ${GIT_COMMIT}")
+
+if(WIN32)
+    set(RC_VERSION ${CMAKE_PROJECT_VERSION_MAJOR},${CMAKE_PROJECT_VERSION_MINOR},${CMAKE_PROJECT_VERSION_PATCH})
+    set(RC_VERSION_STRING "${PROJECT_VERSION} (${GIT_COMMIT})")
+
+    set(RC_EXECUTABLE "serialosc-detector${CMAKE_EXECUTABLE_SUFFIX}")
+    configure_file(src/common/platform/winres/serialosc-cmake.rc.in
+        ${CMAKE_BINARY_DIR}/winres/serialosc-detector.rc)
+
+    set(RC_EXECUTABLE "serialosc-device${CMAKE_EXECUTABLE_SUFFIX}")
+    configure_file(src/common/platform/winres/serialosc-cmake.rc.in
+        ${CMAKE_BINARY_DIR}/winres/serialosc-device.rc)
+
+    set(RC_EXECUTABLE "serialoscd${CMAKE_EXECUTABLE_SUFFIX}")
+    configure_file(src/common/platform/winres/serialosc-cmake.rc.in
+        ${CMAKE_BINARY_DIR}/winres/serialoscd.rc)
+
+    file(COPY_FILE src/common/platform/winres/logo.ico ${CMAKE_BINARY_DIR}/winres/logo.ico)
+endif()
+
 # common
 
 add_library(serialosc_common OBJECT
@@ -76,6 +104,7 @@ endif()
 
 if(WIN32)
     target_sources(serialosc-detector PRIVATE src/serialosc-detector/windows.c)
+    target_sources(serialosc-detector PRIVATE ${CMAKE_BINARY_DIR}/winres/serialosc-detector.rc)
 endif()
 
 target_link_libraries(serialosc-detector serialosc_common)
@@ -135,6 +164,7 @@ target_sources(serialosc-device PRIVATE src/serialosc-device/osc/mext_methods.c)
 
 if(WIN32)
     target_sources(serialosc-device PRIVATE src/serialosc-device/event_loop/windows.c)
+    target_sources(serialosc-device PRIVATE ${CMAKE_BINARY_DIR}/winres/serialosc-device.rc)
 else()
     if(HAVE_WORKING_POLL)
         target_sources(serialosc-device PRIVATE src/serialosc-device/event_loop/poll.c)
@@ -170,20 +200,12 @@ target_link_libraries(serialosc-device serialosc_common confuse monome_static li
 
 # serialoscd
 
-message(STATUS "checking git commit id")
-execute_process(COMMAND "git" "rev-parse" "--verify" "--short" "HEAD" RESULT_VARIABLE GIT_COMMIT_RESULT OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-if(NOT GIT_COMMIT_RESULT EQUAL 0)
-    set(GIT_COMMIT "unknown")
-endif()
-
-message(STATUS "checking git commit id - ${GIT_COMMIT}")
-
 add_executable(serialoscd)
 set_target_properties(serialoscd PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(WIN32)
     target_sources(serialoscd PRIVATE src/serialoscd/win_svc.c)
+    target_sources(serialoscd PRIVATE ${CMAKE_BINARY_DIR}/winres/serialoscd.rc)
 endif()
 
 target_sources(serialoscd PRIVATE src/serialoscd/uv.c)

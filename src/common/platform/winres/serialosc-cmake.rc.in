@@ -1,0 +1,26 @@
+id ICON "logo.ico"
+
+1 VERSIONINFO
+FILEVERSION    @RC_VERSION@
+PRODUCTVERSION @RC_VERSION@
+BEGIN
+	BLOCK "StringFileInfo"
+	BEGIN
+		BLOCK "040904E4"
+		BEGIN
+			VALUE "CompanyName", "Monome"
+			VALUE "FileDescription", "OSC Server for Monome Devices"
+			VALUE "FileVersion", "@RC_VERSION_STRING@"
+			VALUE "InternalName", "serialosc"
+			VALUE "LegalCopyright", "William Light <wrl@illest.net>"
+			VALUE "OriginalFilename", "@RC_EXECUTABLE@"
+			VALUE "ProductName", "serialosc"
+			VALUE "ProductVersion", "@RC_VERSION_STRING@"
+		END
+	END
+
+	BLOCK "VarFileInfo"
+	BEGIN
+		VALUE "Translation", 0x409, 1252
+	END
+END
