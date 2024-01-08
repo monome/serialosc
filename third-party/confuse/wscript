@@ -3,13 +3,21 @@
 top = '../..'
 
 def build(ctx):
+	src = ['confuse.c', 'lexer.c']
+
+	if not ctx.env.HAVE_FMEMOPEN:
+		src.append('fmemopen.c')
+
+	if not ctx.env.HAVE_REALLOCARRAY:
+		src.append('reallocarray.c')
+
 	t = ctx.stlib(
-		source=['confuse.c', 'lexer.c'],
+		source=src,
 		export_includes=['.'],
 
 		defines=[
-			'PACKAGE_VERSION="2.7"',
-			'PACKAGE_STRING="libConfuse 2.7"'],
+			'PACKAGE_VERSION="3.4-dev"',
+			'PACKAGE_STRING="libConfuse 3.4-dev"'],
 
 		target='confuse')
 

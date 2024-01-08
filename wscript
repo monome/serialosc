@@ -110,9 +110,31 @@ def check_strfuncs(ctx):
 			fragment=check_strfunc_template.format(func_name))
 
 	check('strdup')
-	check('_strdup')
 	check('strndup')
 	check('strcasecmp')
+
+def check_miscfuncs(ctx):
+	check_strfunc_template = """
+		#include <stdio.h>
+		#include <stdlib.h>
+
+		int main(int argc, char **argv) {{
+			void (*p)();
+			(void)argc; (void)argv;
+			p=(void(*)())({});
+			return !p;
+		}}
+	"""
+	check = lambda func_name: ctx.check_cc(
+			msg='Checking for {}'.format(func_name),
+			define_name='HAVE_{}'.format(func_name.upper()),
+			mandatory=False,
+			execute=True,
+			fragment=check_strfunc_template.format(func_name))
+
+	check('fmemopen')
+	check('funopen')
+	check('reallocarray')
 
 def check_dnssd_win(conf):
 	conf.check_cc(
@@ -217,7 +239,13 @@ def configure(conf):
 
 	# stuff for libconfuse
 	check_strfuncs(conf)
-	conf.check_cc(define_name='HAVE_UNISTD_H', header_name='unistd.h')
+	check_miscfuncs(conf)
+
+	conf.check_cc(mandatory=False, define_name='HAVE_UNISTD_H', header_name='unistd.h')
+	conf.check_cc(mandatory=False, define_name='HAVE_STRING_H', header_name='string.h')
+	conf.check_cc(mandatory=False, define_name='HAVE_STRINGS_H', header_name='strings.h')
+	conf.check_cc(mandatory=False, define_name='HAVE_SYS_STAT_H', header_name='sys/stat.h')
+	conf.check_cc(mandatory=False, define_name='HAVE_WINDOWS_H', header_name='windows.h')
 
 	if conf.env.DEST_OS == "win32":
 		if not conf.options.disable_zeroconf:
