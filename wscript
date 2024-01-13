@@ -281,9 +281,9 @@ def configure(conf):
 
 
 	if conf.options.enable_debug:
-		conf.env.append_unique("CFLAGS", ["-std=c99",  "-Wall", "-g", "-Og"])
+		conf.env.append_unique("CFLAGS", ["-std=c17",  "-Wall", "-g", "-Og"])
 	else:
-		conf.env.append_unique("CFLAGS", ["-std=c99", "-Wall", "-Werror", "-O2"])
+		conf.env.append_unique("CFLAGS", ["-std=c17", "-Wall", "-Werror", "-O2"])
 
 
 	if conf.env.CC_NAME == "gcc":

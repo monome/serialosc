@@ -7,6 +7,8 @@ endif()
 
 project(serialosc VERSION 1.4.4)
 
+set(CMAKE_C_STANDARD 17)
+
 message(STATUS "configuring libuv")
 
 add_subdirectory(third-party/libuv EXCLUDE_FROM_ALL)

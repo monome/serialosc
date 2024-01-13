@@ -40,7 +40,7 @@ typedef enum {
 typedef struct sosc_ipc_msg {
 	sosc_ipc_type_t type;
 
-	__extension__ union {
+	union {
 		struct {
 			char *devnode;
 		} connection;
