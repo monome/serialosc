@@ -272,8 +272,8 @@ def configure(conf):
 					'-Wl,--enable-stdcall-fixup'])
 		conf.env.append_unique("WINRCFLAGS", ["-O", "coff"])
 	elif conf.env.DEST_OS == "darwin":
-		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.5"])
-		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.5"])
+		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.13"])
+		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.13"])
 
 	if conf.options.disable_zeroconf:
 		conf.define("SOSC_NO_ZEROCONF", True)
