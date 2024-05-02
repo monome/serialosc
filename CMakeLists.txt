@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.27)
+cmake_minimum_required(VERSION 3.25)
 
 if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13")
@@ -6,6 +6,10 @@ if(APPLE)
 endif()
 
 project(serialosc VERSION 1.4.4)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build, options are: Debug Release" FORCE)
+endif()
 
 set(CMAKE_C_STANDARD 17)
 
@@ -222,9 +226,37 @@ target_compile_definitions(serialoscd PRIVATE VERSION="${PROJECT_VERSION}")
 target_compile_definitions(serialoscd PRIVATE GIT_COMMIT="${GIT_COMMIT}")
 target_link_libraries(serialoscd serialosc_common liblo_static uv_a)
 
+install(TARGETS serialoscd serialosc-device serialosc-detector DESTINATION bin)
+
 message(STATUS "configuration summary:
 
     version:    ${PROJECT_VERSION} (${GIT_COMMIT})
     prefix:     ${CMAKE_INSTALL_PREFIX}
     zeroconf:   ${build_with_zeroconf}
 ")
+
+if(LINUX AND EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
+  include(InstallRequiredSystemLibraries)
+
+  set(CPACK_GENERATOR "DEB")
+
+  set(CPACK_PACKAGE_DESCRIPTION "An osc server for monome devices.")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY 
+"It is a daemon that waits for you to plug a monome in, then it spawns off a
+dedicated server process to route OSC messages to and from your monome. it also
+advertises a `_monome-osc._udp` service over zeroconf (bonjour).")
+  set(CPACK_PACKAGE_VENDOR "monome")
+  set(CPACK_PACKAGE_CONTACT "help@monome.org")
+
+  set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYRIGHT")
+
+  set(CPACK_DEBIAN_PACKAGE_RELEASE 1)
+  set(CPACK_DEBIAN_PACKAGE_VERSION ${PROJECT_VERSION})
+  set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/monome/serialosc")
+  set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libudev1 (>= 252.17), libavahi-compat-libdnssd1 (>= 0.8), libavahi-client3 (>= 0.8-10), libavahi-common3 (>= 0.8), libdbus-1-3 (>= 1.14.10), xml-core (>= 0.14)")
+  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+
+  include(CPack)
+endif()
