@@ -1,0 +1,19 @@
+[Unit]
+  Description=serialosc
+  After=multi-user.target
+  StartLimitIntervalSec=500
+  StartLimitBurst=5
+  StartLimitInterval=0
+
+[Service]
+  Type=idle
+  StateDirectory=serialosc
+  ExecStart=/usr/bin/serialoscd -c $STATE_DIRECTORY
+  KillSignal=SIGINT
+  DynamicUser=true
+  Group=dialout
+  Restart=on-failure
+  RestartSec=5s
+
+[Install]
+  WantedBy=multi-user.target

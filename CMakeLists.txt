@@ -227,6 +227,15 @@ target_compile_definitions(serialoscd PRIVATE GIT_COMMIT="${GIT_COMMIT}")
 target_link_libraries(serialoscd serialosc_common liblo_static uv_a)
 
 install(TARGETS serialoscd serialosc-device serialosc-detector DESTINATION bin)
+if (LINUX)
+  install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/config/systemd.service.usr
+    RENAME serialosc.service
+    DESTINATION lib/systemd/system/
+    COMPONENT usr
+    EXCLUDE_FROM_ALL
+  )
+endif()
 
 message(STATUS "configuration summary:
 
@@ -256,7 +265,18 @@ advertises a `_monome-osc._udp` service over zeroconf (bonjour).")
   set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
   set(CPACK_DEBIAN_PACKAGE_DEPENDS "libudev1 (>= 252.17), libavahi-compat-libdnssd1 (>= 0.8), libavahi-client3 (>= 0.8-10), libavahi-common3 (>= 0.8), libdbus-1-3 (>= 1.14.10), xml-core (>= 0.14)")
   set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-  set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "misc")
+
+  #get usr
+  set(CPACK_DEB_COMPONENT_INSTALL ON)
+  set(CPACK_COMPONENTS_GROUPING "ALL_COMPONENTS_IN_ONE")
+  
+  set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    ${CMAKE_CURRENT_SOURCE_DIR}/debian/prerm
+    ${CMAKE_CURRENT_SOURCE_DIR}/debian/postrm
+    ${CMAKE_CURRENT_SOURCE_DIR}/debian/postinst
+    ${CMAKE_CURRENT_SOURCE_DIR}/debian/copyright
+  )
 
   include(CPack)
 endif()
