@@ -286,7 +286,7 @@ def configure(conf):
 		conf.env.append_unique("CFLAGS", ["-std=c17", "-Wall", "-Werror", "-O2"])
 
 
-	if conf.env.CC_NAME == "gcc":
+	if conf.env.CC_NAME in ["gcc", "clang"]:
 		# FIXME: a poor solution perhaps, it will do for now.
 		# would be better to fix all the relevant signatures.
 		conf.env.append_unique("CFLAGS", ["-Wno-incompatible-pointer-types"])
