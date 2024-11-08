@@ -34,6 +34,12 @@ cmake --build .
 
 cmake project is currently configured to build statically linked binaries using bundled libmonome, liblo, libuv and is the suggested way of building serialosc on windows (msys2).
 
+## running at boot
+
+On Linux, a systemd unit will be available as the unpriviledged user that ran the installation. You can enable serialoscd to start at boot by running `systemctl --user enable serialoscd.service` which will start the daemon at each login.
+
+To manually start and stop, this works like any other systemd unit, for example to start manually `systemctl --user start serialoscd.service` will do.
+
 ## documentation
 
 https://monome.org/docs/serialosc
