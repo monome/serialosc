@@ -1,0 +1,9 @@
+[Unit]
+Description=Starts serialoscd at system boot
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/serialoscd
+
+[Install]
+WantedBy=multi-user.target

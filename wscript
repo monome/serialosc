@@ -313,6 +313,13 @@ def build(bld):
 	bld.recurse("third-party")
 	bld.recurse("src")
 
+def install(ctx):
+    # install a systemd unit file
+    if ctx.env.DEST_OS == 'linux':
+        user_home = os.path.expanduser("~")
+        ctx.install_files(os.path.join(user_home, '.config/systemd/user'), 'serialoscd.service')
+        ctx.exec_command('systemctl daemon-reload')
+
 def dist(dst):
 	pats = [".git*", "**/.git*", ".travis.yml", "**/__pycache__"]
 	with open(".gitignore") as gitignore:
