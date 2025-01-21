@@ -69,27 +69,17 @@ test_cdc_driver(struct udev_device *ud) {
 static char
 test_monome_props(struct udev_device *ud)
 {
-	char *vendor, *model;
+	char *vendor;
 	const char *tmp;
 	tmp = udev_device_get_property_value(ud, "ID_VENDOR");
 	if (!tmp) return 0;
-
 	vendor = strdup(tmp);
 
-	tmp = udev_device_get_property_value(ud, "ID_MODEL");
-	if (!tmp) { 
-		free(vendor);
-		return 0;
-	}
-
-	model = strdup(tmp);
-
 	char res = 0;
-	if (vendor != NULL && model != NULL) { 
-		res = (strcmp(vendor, "monome") == 0) && (strcmp(model, "grid") == 0);
+	if (vendor != NULL) {
+		res = (strcmp(vendor, "monome") == 0);
 	}
 
-	free(model);
 	free(vendor);
 	return res;
 }
@@ -128,14 +118,14 @@ has_usb_cdc_parent(struct udev_device *ud) {
 
 static int
 is_device_compatible(struct udev_device *ud) {
+	if (!test_monome_props(ud)) {
+		return 0;
+	}
 	if (has_usb_serial_parent(ud)) { 
 		return 1;
 	} 
 	if (!has_usb_cdc_parent(ud)) {
 		return 0;
-	}
-	if (test_monome_props(ud)) { 
-		return 1;
 	}
 	if (test_monome_serial(ud)) { 
 		return 1;
