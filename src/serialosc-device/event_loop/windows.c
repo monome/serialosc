@@ -24,21 +24,14 @@
 #include <serialosc/serialosc.h>
 #include <serialosc/ipc.h>
 
-#ifdef _LP64
-#define PRIdword  "d"
-#define PRIudword "u"
-#else
-#define PRIdword  "ld"
-#define PRIudword "lu"
-#endif
-
 static int
-recv_msg(struct sosc_state *state, int ipc_fd)
+recv_ipc_msg(struct sosc_state *state, int ipc_fd)
 {
 	struct sosc_ipc_msg msg;
 
-	if (sosc_ipc_msg_read(ipc_fd, &msg) <= 0)
+	if (sosc_ipc_msg_read(ipc_fd, &msg) <= 0) {
 		return 0;
+	}
 
 	switch (msg.type) {
 	case SOSC_PROCESS_SHOULD_EXIT:
@@ -50,124 +43,111 @@ recv_msg(struct sosc_state *state, int ipc_fd)
 	}
 }
 
-struct poll_thread_ctx {
-	struct sosc_state *state;
-	HANDLE wakeup_handle;
-};
+int
+wait_for_serial_input(HANDLE hres, LPOVERLAPPED ov, DWORD timeout)
+{
+	DWORD event_mask;
+	int result = 0;
+
+	SetCommMask(hres, EV_RXCHAR);
+
+	if (!WaitCommEvent(hres, &event_mask, ov)) {
+		if (GetLastError() == ERROR_IO_PENDING) {
+			switch (WaitForSingleObject(ov->hEvent, timeout)) {
+			case WAIT_OBJECT_0:
+				result = 0;
+				break;
+			case WAIT_TIMEOUT:
+				result = 1;
+				break;
+			default:
+				result = -1;
+				break;
+			}
+		} else {
+			result = -1;
+		}
+	} else {
+		result = 0;
+	}
+
+	return result;
+}
 
 static DWORD WINAPI
-stdin_poll_thread(LPVOID _ctx)
+stdin_poll_thread(LPVOID arg)
 {
-	struct poll_thread_ctx *ctx = _ctx;
+	struct sosc_state *state = arg;
 
 	SetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), ENABLE_PROCESSED_INPUT);
 
-	for (;;) {
-		recv_msg(ctx->state, STDIN_FILENO);
-		SetEvent(ctx->wakeup_handle);
+	while (state->running) {
+		recv_ipc_msg(state, STDIN_FILENO);
 	}
 
 	return 0;
 }
 
-static bool
-wait_for_serial_input(HANDLE file, LPOVERLAPPED ov)
+static DWORD WINAPI
+serial_poll_thread(LPVOID arg)
 {
-	DWORD evt_mask;
+	struct sosc_state *state = arg;
 
-	SetCommMask(file, EV_RXCHAR);
+	OVERLAPPED ov = {0, 0, {{0, 0}}};
+	ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	int status;
 
-	if (!WaitCommEvent(file, &evt_mask, ov)) {
-		switch (GetLastError()) {
-		case ERROR_IO_PENDING:
-			break;
-		/* evidently we get this when the monome is unplugged? */
-		case ERROR_ACCESS_DENIED:
-			return false;
-		default:
-			fprintf(stderr, "wait_for_serial_input() error: %"PRIdword"\n", GetLastError());
-			return false;
+	HANDLE monome_handle = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
+
+	while (state->running) {
+		if (wait_for_serial_input(monome_handle, &ov, INFINITE) == 0) {
+			do {
+				status = monome_event_handle_next(state->monome);
+			} while (status > 0);
+
+			if (status < 0) {
+				goto err;
+			}
+		} else {
+			goto err;
 		}
 	}
 
-	return true;
+err:
+	CloseHandle(ov.hEvent);
+	return 0;
+}
+
+static DWORD WINAPI
+osc_poll_thread(LPVOID arg)
+{
+	struct sosc_state *state = arg;
+
+	while (state->running) {
+		lo_server_recv(state->server);
+	}
+
+	return 0;
 }
 
 int
 sosc_event_loop(struct sosc_state *state)
 {
-	OVERLAPPED ov = {0, 0, {{0, 0}}};
-	HANDLE hres, wait_handles[3];
-	WSANETWORKEVENTS network_events;
-	struct poll_thread_ctx ctx;
-	ssize_t nbytes;
-	int status;
+	HANDLE threads[3];
 
-	wait_handles[0] = ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	state->running = true;
 
-	wait_handles[1] = WSACreateEvent();
-	WSAEventSelect(lo_server_get_socket_fd(state->server),
-			wait_handles[1], FD_READ);
+	threads[0] = CreateThread(NULL, 0, serial_poll_thread, state, 0, NULL);
+	threads[1] = CreateThread(NULL, 0, osc_poll_thread, state, 0, NULL);
 
-	wait_handles[2] = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	state->running = 1;
-
-	if (state->ipc_in_fd > -1 || 1) {
-		ctx.state = state;
-		ctx.wakeup_handle = wait_handles[2];
-
-		CreateThread(NULL, 0, stdin_poll_thread, &ctx, 0, NULL);
+	if (state->ipc_in_fd > -1) {
+		threads[2] = CreateThread(NULL, 0, stdin_poll_thread, state, 0, NULL);
+	} else {
+		// wait for a dummy event if no ipc
+		threads[2] = CreateEvent(NULL, TRUE, FALSE, NULL);
 	}
 
-	hres = (HANDLE) _get_osfhandle(monome_get_fd(state->monome));
-
-	if (!wait_for_serial_input(hres, &ov)) {
-		return 1;
-	}
-
-	while (state->running) {
-		switch (WaitForMultipleObjects(3, wait_handles, FALSE, INFINITE)) {
-		case WAIT_OBJECT_0:
-			do {
-				status = monome_event_handle_next(state->monome);
-
-				if (status < 0) {
-					return 1;
-				}
-			} while (status > 0);
-
-			// reset the event and wait for more input
-			if (!wait_for_serial_input(hres, &ov)) {
-				return 1;
-			}
-
-			break;
-
-		case WAIT_OBJECT_0 + 1:
-			WSAEnumNetworkEvents(lo_server_get_socket_fd(state->server),
-				wait_handles[1],
-				&network_events);
-			do {
-				nbytes = lo_server_recv_noblock(state->server, 0);
-			} while (nbytes > 0);
-
-			break;
-
-		case WAIT_OBJECT_0 + 2:
-			ResetEvent(wait_handles[2]);
-			break;
-
-		case WAIT_TIMEOUT:
-			break;
-
-		case WAIT_ABANDONED_0:
-		case WAIT_FAILED:
-			fprintf(stderr, "event_loop(): wait failed: %"PRIdword"\n",
-			        GetLastError());
-			return 1;
-		}
-	}
+	WaitForMultipleObjects(3, threads, FALSE, INFINITE);
 
 	return 0;
 }
