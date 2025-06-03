@@ -5,7 +5,7 @@ if(APPLE)
     set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
 endif()
 
-project(serialosc VERSION 1.4.5)
+project(serialosc VERSION 1.4.6)
 
 set(CMAKE_C_STANDARD 17)
 
