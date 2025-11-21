@@ -196,6 +196,12 @@ OSC_HANDLER_FUNC(led_ring_range_handler)
 	return monome_led_ring_range(monome, argv[0]->i, argv[1]->i, argv[2]->i, argv[3]->i);
 }
 
+OSC_HANDLER_FUNC(led_ring_intensity_handler)
+{
+	monome_t *monome = user_data;
+	return monome_led_ring_intensity(monome, argv[0]->i);
+}
+
 OSC_HANDLER_FUNC(tilt_set_handler)
 {
 	monome_t *monome = user_data;
@@ -285,6 +291,9 @@ osc_register_methods(sosc_state_t *state)
 
 	METHOD("ring/range")
 		REGISTER("iiii", led_ring_range_handler);
+
+	METHOD("ring/intensity")
+		REGISTER("i", led_ring_intensity_handler);
 
 	METHOD("tilt/set")
 		REGISTER("ii", tilt_set_handler);
