@@ -12,13 +12,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - name: linux
+            os: ubuntu-latest
             shell: bash
-          - os: macos-latest
+          - name: macos
+            os: macos-latest
             shell: bash
-          - os: windows-latest
+          - name: windows
+            os: windows-latest
             shell: msys2 {0}
 
+    name: build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
 
     defaults:
