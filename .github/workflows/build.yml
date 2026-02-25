@@ -13,10 +13,17 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            shell: bash
           - os: macos-latest
+            shell: bash
           - os: windows-latest
+            shell: msys2 {0}
 
     runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
 
     steps:
       - uses: actions/checkout@v4
@@ -45,12 +52,10 @@ jobs:
             mingw-w64-clang-x86_64-ninja
 
       - name: configure
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
         run: |
           cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: build
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
         run: |
           cmake --build build
 
