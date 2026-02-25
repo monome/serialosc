@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [main, github-actions-windows-build]
+    branches: [main]
   pull_request:
     branches: [main]
 
