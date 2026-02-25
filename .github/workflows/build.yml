@@ -39,11 +39,6 @@ jobs:
         run: |
           sudo apt update && sudo apt install -y build-essential cmake ninja-build libudev-dev
 
-      - name: Install dependencies (macos)
-        if: runner.os == 'macOS'
-        run: |
-          brew install cmake ninja
-
       - name: install dependencies (windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
