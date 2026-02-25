@@ -1,0 +1,63 @@
+name: build
+
+on:
+  push:
+    branches: [main, github-actions-windows-build]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install dependencies (linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update && sudo apt install -y build-essential cmake ninja-build libudev-dev
+
+      - name: Install dependencies (macos)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake ninja
+
+      - name: install dependencies (windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+
+      - name: configure
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: |
+          cmake --build build
+
+      - name: upload artifacts (windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: serialosc-windows
+          path: build/bin/
+          if-no-files-found: warn
