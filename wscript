@@ -275,9 +275,9 @@ def configure(conf):
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.13"])
 		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.13"])
 
-	if conf.options.disable_zeroconf:
-		conf.define("SOSC_NO_ZEROCONF", True)
-		conf.env.SOSC_NO_ZEROCONF = True
+	if not conf.options.disable_zeroconf:
+		conf.define("SOSC_ZEROCONF", True)
+		conf.env.SOSC_ZEROCONF = True
 
 
 	if conf.options.enable_debug:

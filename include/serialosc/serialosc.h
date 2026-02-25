@@ -20,7 +20,7 @@
 #include <winsock2.h>
 #endif
 
-#ifndef SOSC_NO_ZEROCONF
+#ifdef SOSC_ZEROCONF
 #include <dns_sd.h>
 #endif
 
@@ -61,7 +61,7 @@ typedef struct sosc_state {
 	int ipc_in_fd;
 	int ipc_out_fd;
 
-#ifndef SOSC_NO_ZEROCONF
+#ifdef SOSC_ZEROCONF
 	DNSServiceRef ref;
 #endif
 

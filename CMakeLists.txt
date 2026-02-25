@@ -176,6 +176,7 @@ else()
 endif()
 
 if(build_with_zeroconf)
+    add_compile_definitions(SOSC_ZEROCONF)
     target_sources(serialosc-device PRIVATE src/serialosc-device/zeroconf/common.c)
 
     if(LINUX)
@@ -188,7 +189,6 @@ if(build_with_zeroconf)
         target_sources(serialosc-device PRIVATE src/serialosc-device/zeroconf/windows.c)
     endif()
 else()
-    add_compile_definitions(SOSC_NO_ZEROCONF)
     target_sources(serialosc-device PRIVATE src/serialosc-device/zeroconf/dummy.c)
 endif()
 

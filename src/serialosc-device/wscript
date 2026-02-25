@@ -6,9 +6,7 @@ def build(ctx):
 	objs = []
 	obj = lambda src: objs.append(src)
 
-	if ctx.env.SOSC_NO_ZEROCONF:
-		obj('zeroconf/dummy.c')
-	else:
+	if ctx.env.SOSC_ZEROCONF:
 		obj('zeroconf/common.c')
 
 		if ctx.env.DEST_OS[:3] == "win":
@@ -17,6 +15,8 @@ def build(ctx):
 			obj('zeroconf/not_darwin.c')
 		elif ctx.env.DEST_OS == 'darwin':
 			obj('zeroconf/darwin.c')
+	else:
+		obj('zeroconf/dummy.c')
 
 	if ctx.env.DEST_OS[:3] == "win":
 		obj('event_loop/windows.c')
