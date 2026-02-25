@@ -62,7 +62,7 @@ typedef struct sosc_state {
 	int ipc_out_fd;
 
 #ifdef SOSC_ZEROCONF
-	DNSServiceRef ref;
+	DNSServiceRef dnssd_service_ref;
 #endif
 
 	sosc_config_t config;
