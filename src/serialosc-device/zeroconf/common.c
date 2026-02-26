@@ -40,7 +40,7 @@ sosc_zeroconf_register(sosc_state_t *state, const char *svc_name)
 		return;
 
 	sosc_dnssd_registration_func(
-		/* sdref          */  &state->ref,
+		/* sdref          */  &state->dnssd_service_ref,
 		/* interfaceIndex */  0,
 		/* flags          */  0,
 		/* name           */  svc_name,
@@ -60,5 +60,5 @@ sosc_zeroconf_unregister(sosc_state_t *state)
 	if (!sosc_dnssd_deallocation_func)
 		return;
 
-	sosc_dnssd_deallocation_func(state->ref);
+	sosc_dnssd_deallocation_func(state->dnssd_service_ref);
 }

@@ -139,8 +139,8 @@ def check_miscfuncs(ctx):
 def check_dnssd_win(conf):
 	conf.check_cc(
 		mandatory=True,
-		header_name="dns_sd.h",
-		includes=["c:/program files/bonjour sdk/include"],
+		header_name="windns.h",
+		lib="dnsapi",
 		uselib_store="DNSSD_INC")
 
 
@@ -275,9 +275,9 @@ def configure(conf):
 		conf.env.append_unique("CFLAGS", ["-mmacosx-version-min=10.13"])
 		conf.env.append_unique("LINKFLAGS", ["-mmacosx-version-min=10.13"])
 
-	if conf.options.disable_zeroconf:
-		conf.define("SOSC_NO_ZEROCONF", True)
-		conf.env.SOSC_NO_ZEROCONF = True
+	if not conf.options.disable_zeroconf:
+		conf.define("SOSC_ZEROCONF", True)
+		conf.env.SOSC_ZEROCONF = True
 
 
 	if conf.options.enable_debug:

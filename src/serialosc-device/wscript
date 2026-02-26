@@ -6,17 +6,17 @@ def build(ctx):
 	objs = []
 	obj = lambda src: objs.append(src)
 
-	if ctx.env.SOSC_NO_ZEROCONF:
-		obj('zeroconf/dummy.c')
-	else:
-		obj('zeroconf/common.c')
-
+	if ctx.env.SOSC_ZEROCONF:
 		if ctx.env.DEST_OS[:3] == "win":
 			obj('zeroconf/windows.c')
-		elif ctx.env.DEST_OS == 'linux':
-			obj('zeroconf/not_darwin.c')
-		elif ctx.env.DEST_OS == 'darwin':
-			obj('zeroconf/darwin.c')
+		else:
+			obj('zeroconf/common.c')
+			if ctx.env.DEST_OS == 'linux':
+				obj('zeroconf/not_darwin.c')
+			elif ctx.env.DEST_OS == 'darwin':
+				obj('zeroconf/darwin.c')
+	else:
+		obj('zeroconf/dummy.c')
 
 	if ctx.env.DEST_OS[:3] == "win":
 		obj('event_loop/windows.c')
