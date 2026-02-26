@@ -37,7 +37,7 @@ jobs:
       - name: install dependencies (linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt update && sudo apt install -y build-essential cmake ninja-build libudev-dev
+          sudo apt update && sudo apt install -y build-essential cmake ninja-build libudev-dev libavahi-compat-libdnssd-dev
 
       - name: install dependencies (windows)
         if: runner.os == 'Windows'
