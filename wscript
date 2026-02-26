@@ -139,8 +139,8 @@ def check_miscfuncs(ctx):
 def check_dnssd_win(conf):
 	conf.check_cc(
 		mandatory=True,
-		header_name="dns_sd.h",
-		includes=["c:/program files/bonjour sdk/include"],
+		header_name="windns.h",
+		lib="dnsapi",
 		uselib_store="DNSSD_INC")
 
 

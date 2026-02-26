@@ -16,12 +16,13 @@
 
 #pragma once
 
-#ifdef _WIN32
-#include <winsock2.h>
-#endif
-
 #ifdef SOSC_ZEROCONF
+#ifdef _WIN32
+#include <windows.h>
+#include <windns.h>
+#else
 #include <dns_sd.h>
+#endif
 #endif
 
 #include <lo/lo.h>
@@ -62,7 +63,11 @@ typedef struct sosc_state {
 	int ipc_out_fd;
 
 #ifdef SOSC_ZEROCONF
+#ifdef _WIN32
+	PDNS_SERVICE_INSTANCE dnssd_service_ref;
+#else
 	DNSServiceRef dnssd_service_ref;
+#endif
 #endif
 
 	sosc_config_t config;
