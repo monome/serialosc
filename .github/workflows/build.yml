@@ -30,7 +30,7 @@ jobs:
               mingw-w64-clang-x86_64-ninja
 
           - name: windows-arm64
-            os: windows-latest
+            os: windows-11-arm
             shell: msys2 {0}
             msystem: CLANGARM64
             msys_packages: >-
