@@ -15,12 +15,28 @@ jobs:
           - name: linux
             os: ubuntu-latest
             shell: bash
+
           - name: macos
             os: macos-latest
             shell: bash
-          - name: windows
+
+          - name: windows-x64
             os: windows-latest
             shell: msys2 {0}
+            msystem: CLANG64
+            msys_packages: >-
+              mingw-w64-clang-x86_64-toolchain
+              mingw-w64-clang-x86_64-cmake
+              mingw-w64-clang-x86_64-ninja
+
+          - name: windows-arm64
+            os: windows-11-arm
+            shell: msys2 {0}
+            msystem: CLANGARM64
+            msys_packages: >-
+              mingw-w64-clang-aarch64-toolchain
+              mingw-w64-clang-aarch64-cmake
+              mingw-w64-clang-aarch64-ninja
 
     name: build (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
@@ -43,12 +59,9 @@ jobs:
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: CLANG64
+          msystem: ${{ matrix.msystem }}
           update: true
-          install: >-
-            mingw-w64-clang-x86_64-toolchain
-            mingw-w64-clang-x86_64-cmake
-            mingw-w64-clang-x86_64-ninja
+          install: ${{ matrix.msys_packages }}
 
       - name: configure
         run: |
@@ -62,6 +75,6 @@ jobs:
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: serialosc-windows
+          name: serialosc-${{ matrix.name }}
           path: build/bin/
           if-no-files-found: warn
