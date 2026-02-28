@@ -79,19 +79,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: install nsis
-        shell: cmd
-        run: choco install nsis -y
-
       - name: install dependencies
         uses: msys2/setup-msys2@v2
         with:
           msystem: CLANG64
           update: true
           install: >-
-            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-clang
             mingw-w64-clang-x86_64-cmake
             mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-nsis
 
       - name: configure
         run: |
@@ -102,10 +99,8 @@ jobs:
           cmake --build build
 
       - name: build installer
-        shell: cmd
         run: |
-          call refreshenv
-          makensis /DFILE_SRC=%CD%\build\bin /DARCH=x86_64 installers\windows\installer.nsi
+          makensis //DFILE_SRC=$(cygpath -w "$PWD/build/bin") //DARCH=x86_64 installers/windows/installer.nsi
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -127,19 +122,16 @@ jobs:
         with:
           submodules: recursive
 
-      - name: install nsis
-        shell: cmd
-        run: choco install nsis -y
-
       - name: install dependencies
         uses: msys2/setup-msys2@v2
         with:
           msystem: CLANGARM64
           update: true
           install: >-
-            mingw-w64-clang-aarch64-toolchain
+            mingw-w64-clang-aarch64-clang
             mingw-w64-clang-aarch64-cmake
             mingw-w64-clang-aarch64-ninja
+            mingw-w64-clang-x86_64-nsis
 
       - name: configure
         run: |
@@ -150,10 +142,8 @@ jobs:
           cmake --build build
 
       - name: build installer
-        shell: cmd
         run: |
-          call refreshenv
-          makensis /DFILE_SRC=%CD%\build\bin /DARCH=arm64 installers\windows\installer.nsi
+          makensis //DFILE_SRC=$(cygpath -w "$PWD/build/bin") //DARCH=arm64 installers/windows/installer.nsi
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
