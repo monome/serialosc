@@ -8,8 +8,8 @@ BEGIN
 	BEGIN
 		BLOCK "040904E4"
 		BEGIN
-			VALUE "CompanyName", "Monome"
-			VALUE "FileDescription", "OSC Server for Monome Devices"
+			VALUE "CompanyName", "monome"
+			VALUE "FileDescription", "OSC server for monome devices"
 			VALUE "FileVersion", "@RC_VERSION_STRING@"
 			VALUE "InternalName", "serialosc"
 			VALUE "LegalCopyright", "William Light <wrl@illest.net>"

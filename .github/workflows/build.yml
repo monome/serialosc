@@ -85,9 +85,10 @@ jobs:
           msystem: CLANG64
           update: true
           install: >-
-            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-clang
             mingw-w64-clang-x86_64-cmake
             mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-nsis
 
       - name: configure
         run: |
@@ -97,11 +98,15 @@ jobs:
         run: |
           cmake --build build
 
+      - name: build installer
+        run: |
+          makensis //DFILE_SRC=$(cygpath -w "$PWD/build/bin") //DARCH=x86_64 installers/windows/installer.nsi
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: serialosc-windows-x86_64
-          path: build/bin/
+          path: installers/windows/serialosc-*.exe
           if-no-files-found: warn
 
   windows-arm64:
@@ -123,9 +128,10 @@ jobs:
           msystem: CLANGARM64
           update: true
           install: >-
-            mingw-w64-clang-aarch64-toolchain
+            mingw-w64-clang-aarch64-clang
             mingw-w64-clang-aarch64-cmake
             mingw-w64-clang-aarch64-ninja
+            mingw-w64-clang-x86_64-nsis
 
       - name: configure
         run: |
@@ -135,9 +141,13 @@ jobs:
         run: |
           cmake --build build
 
+      - name: build installer
+        run: |
+          /clang64/bin/makensis //DFILE_SRC=$(cygpath -w "$PWD/build/bin") //DARCH=arm64 installers/windows/installer.nsi
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: serialosc-windows-arm64
-          path: build/bin/
+          path: installers/windows/serialosc-*.exe
           if-no-files-found: warn
