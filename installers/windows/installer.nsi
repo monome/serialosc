@@ -36,7 +36,11 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_LANGUAGE "English"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
-OutFile "${PRODUCT_NAME}-${PRODUCT_VERSION}.exe"
+!ifdef ARCH
+  OutFile "${PRODUCT_NAME}-${PRODUCT_VERSION}-${ARCH}.exe"
+!else
+  OutFile "${PRODUCT_NAME}-${PRODUCT_VERSION}.exe"
+!endif
 InstallDir "$PROGRAMFILES64\Monome\serialosc"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 RequestExecutionLevel admin
