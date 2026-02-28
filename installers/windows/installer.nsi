@@ -1,7 +1,7 @@
 !include "LogicLib.nsh"
 
 !define PRODUCT_NAME "serialosc"
-!define PRODUCT_VERSION "1.4.6"
+!define PRODUCT_VERSION "1.4.7"
 !define PRODUCT_PUBLISHER "monome"
 !define PRODUCT_WEB_SITE "https://monome.org/"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\serialoscd.exe"
