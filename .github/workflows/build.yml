@@ -143,7 +143,7 @@ jobs:
 
       - name: build installer
         run: |
-          makensis //DFILE_SRC=$(cygpath -w "$PWD/build/bin") //DARCH=arm64 installers/windows/installer.nsi
+          /clang64/bin/makensis //DFILE_SRC=$(cygpath -w "$PWD/build/bin") //DARCH=arm64 installers/windows/installer.nsi
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
