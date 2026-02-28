@@ -7,61 +7,18 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: linux
-            os: ubuntu-latest
-            shell: bash
-
-          - name: macos
-            os: macos-latest
-            shell: bash
-
-          - name: windows-x64
-            os: windows-latest
-            shell: msys2 {0}
-            msystem: CLANG64
-            msys_packages: >-
-              mingw-w64-clang-x86_64-toolchain
-              mingw-w64-clang-x86_64-cmake
-              mingw-w64-clang-x86_64-ninja
-
-          - name: windows-arm64
-            os: windows-11-arm
-            shell: msys2 {0}
-            msystem: CLANGARM64
-            msys_packages: >-
-              mingw-w64-clang-aarch64-toolchain
-              mingw-w64-clang-aarch64-cmake
-              mingw-w64-clang-aarch64-ninja
-
-    name: build (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-
-    defaults:
-      run:
-        shell: ${{ matrix.shell }}
+  linux-x86_64:
+    name: build (linux-x86_64)
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: install dependencies (linux)
-        if: runner.os == 'Linux'
+      - name: install dependencies
         run: |
           sudo apt update && sudo apt install -y build-essential cmake ninja-build libudev-dev libavahi-compat-libdnssd-dev
-
-      - name: install dependencies (windows)
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: ${{ matrix.msystem }}
-          update: true
-          install: ${{ matrix.msys_packages }}
 
       - name: configure
         run: |
@@ -71,10 +28,116 @@ jobs:
         run: |
           cmake --build build
 
-      - name: upload artifacts (windows)
-        if: runner.os == 'Windows'
+  linux-arm64:
+    name: build (linux-arm64)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install dependencies
+        run: |
+          sudo apt update && sudo apt install -y build-essential cmake ninja-build libudev-dev libavahi-compat-libdnssd-dev
+
+      - name: configure
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: |
+          cmake --build build
+
+  macos:
+    name: build (macos-universal)
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: configure
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: |
+          cmake --build build
+
+  windows-x86_64:
+    name: build (windows-x86_64)
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+
+      - name: configure
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: |
+          cmake --build build
+
+      - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: serialosc-${{ matrix.name }}
+          name: serialosc-windows-x86_64
+          path: build/bin/
+          if-no-files-found: warn
+
+  windows-arm64:
+    name: build (windows-arm64)
+    runs-on: windows-11-arm
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: install dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANGARM64
+          update: true
+          install: >-
+            mingw-w64-clang-aarch64-toolchain
+            mingw-w64-clang-aarch64-cmake
+            mingw-w64-clang-aarch64-ninja
+
+      - name: configure
+        run: |
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: |
+          cmake --build build
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: serialosc-windows-arm64
           path: build/bin/
           if-no-files-found: warn
