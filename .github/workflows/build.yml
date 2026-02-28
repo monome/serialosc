@@ -105,7 +105,7 @@ jobs:
         shell: cmd
         run: |
           call refreshenv
-          makensis /DFILE_SRC=build\bin /DARCH=x86_64 installers\windows\installer.nsi
+          makensis /DFILE_SRC=%CD%\build\bin /DARCH=x86_64 installers\windows\installer.nsi
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -153,7 +153,7 @@ jobs:
         shell: cmd
         run: |
           call refreshenv
-          makensis /DFILE_SRC=build\bin /DARCH=arm64 installers\windows\installer.nsi
+          makensis /DFILE_SRC=%CD%\build\bin /DARCH=arm64 installers\windows\installer.nsi
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
