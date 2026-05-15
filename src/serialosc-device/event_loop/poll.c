@@ -39,6 +39,12 @@ recv_msg(struct sosc_state *state, int ipc_fd)
 	}
 }
 
+static int
+fd_error(short revents)
+{
+	return revents & (POLLHUP | POLLERR | POLLNVAL);
+}
+
 int
 sosc_event_loop(struct sosc_state *state)
 {
@@ -71,8 +77,12 @@ sosc_event_loop(struct sosc_state *state)
 			}
 
 		/* is the monome still connected? */
-		if (fds[0].revents & (POLLHUP | POLLERR))
+		if (fd_error(fds[0].revents))
 			break;
+
+		if (fd_error(fds[1].revents)
+				|| (state->ipc_in_fd > -1 && fd_error(fds[2].revents)))
+			return 1;
 
 		/* is there data available for reading from the monome? */
 		if (fds[0].revents & POLLIN)
