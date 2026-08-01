@@ -17,7 +17,6 @@
 #define _DEFAULT_SOURCE
 
 #include <stdlib.h>
-#include <string.h>
 #include <stdio.h>
 
 #include <uv.h>
@@ -67,8 +66,6 @@ main(int argc, char **argv)
 		fprintf(stderr, "%s: failed to open device %s\n", argv[0], device_arg);
 		return EXIT_FAILURE;
 	}
-
-	argv[0][strlen(argv[0]) - 1] = ' ';
 
 #ifndef WIN32
 	setenv("AVAHI_COMPAT_NOWARN", "shut up", 1);
